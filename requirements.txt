@@ -1,0 +1,21 @@
+
+# Installation Instructions
+'''
+Method 1: Global installation:
+  pip install -r requirements.txt
+
+ Method 2: Virtual environment:
+  python -m venv venv
+  source venv/bin/activate   (Linux/Mac)
+  venv\Scripts\activate      (Windows)
+  pip install -r requirements.txt
+  '''
+
+
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+motor==3.6.0
+pymongo==4.10.1
+httpx==0.28.0
+python-dotenv==1.0.1
+pydantic==2.10.3

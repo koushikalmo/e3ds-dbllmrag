@@ -1,0 +1,18 @@
+[
+  {
+    "name": "stream-datastore",
+    "env_uri": "MONGODB_URI_STREAM",
+    "env_db_name": "STREAM_DB_NAME",
+    "default_db_name": "stream-datastore",
+    "description": "Monthly streaming session records. One document per user session. Contains load time, WebRTC quality metrics, geographic data (city, country), device info (browser, OS), server hardware, and connection timestamps. Use for session counts, performance analysis, geographic distribution, device breakdowns.",
+    "default_collection": "Apr_2026"
+  },
+  {
+    "name": "appConfigs",
+    "env_uri": "MONGODB_URI_APPCONFIGS",
+    "env_db_name": "APPCONFIGS_DB_NAME",
+    "default_db_name": "appConfigs",
+    "description": "Per-owner account configurations. Subscription status, billing, API keys, concurrent user limits, streaming app settings. Each collection is named after the owner username. Use for subscription expiry, account limits, API key management.",
+    "default_collection": null
+  }
+]
