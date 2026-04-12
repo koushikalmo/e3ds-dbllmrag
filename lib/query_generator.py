@@ -218,6 +218,25 @@ def _validate_structure(obj: dict) -> dict:
                 raise ValueError(f"Dual query item [{i}] is missing 'pipeline'.")
             if not isinstance(q["pipeline"], list):
                 raise ValueError(f"Dual query item [{i}] 'pipeline' must be a list.")
+            if "database" not in q:
+                raise ValueError(
+                    f"Dual query item [{i}] is missing 'database'. "
+                    "Each sub-query must specify 'database': 'stream-datastore' or 'appConfigs'."
+                )
+            if q["database"] not in ("stream-datastore", "appConfigs"):
+                raise ValueError(
+                    f"Dual query item [{i}] has invalid database: '{q['database']}'. "
+                    "Must be 'stream-datastore' or 'appConfigs'."
+                )
+            # appConfigs sub-queries MUST have a collection (owner username).
+            # Stream sub-queries get a default from db_registry if omitted.
+            if q["database"] == "appConfigs" and not q.get("collection"):
+                raise ValueError(
+                    f"Dual query item [{i}] targets 'appConfigs' but is missing 'collection'. "
+                    "For appConfigs, 'collection' must be the owner's username "
+                    "(e.g. 'eduardo'). If the question mentions a specific owner, use it. "
+                    "If not, use a representative owner like 'eduardo' as a placeholder."
+                )
         return obj
 
     raise ValueError(
@@ -290,21 +309,45 @@ def _validate_field_names(query_obj: dict) -> list[str]:
     return suspicious
 
 
+_FIELD_ALIASES: dict[str, str] = {
+    # Common LLM mistakes — maps wrong field → correct field
+    "clientinfo.country_code":   "clientInfo.country_name",
+    "clientinfo.countrycode":    "clientInfo.country_name",
+    "clientinfo.country":        "clientInfo.country_name",
+    "appinfo.appname":           "appInfo.appName",
+    "appinfo.app_name":          "appInfo.appName",
+    "userdeviceinfo.os":         "userDeviceInfo.os.name",
+    "webrtcstatsdata.bitrate":   "webRtcStatsData.avgBitrate",
+    "webrtcstatsdata.rtt":       "webRtcStatsData.avgRoundTripTime",
+}
+
+
 def _find_closest_field(bad_field: str) -> str | None:
     """
     Finds the closest known field name by case-insensitive match.
     Returns a hint for the correction prompt.
 
-    Example: "appinfo.owner" → "appInfo.owner"
-    """
-    known_fields = _get_known_fields()
-    bad_lower    = bad_field.lower()
+    Checks hardcoded aliases first (common LLM mistakes), then falls
+    back to case-insensitive and leaf-component matching against the
+    vector store.
 
+    Example: "clientInfo.country_code" → "clientInfo.country_name"
+    Example: "appinfo.owner"           → "appInfo.owner"
+    """
+    bad_lower = bad_field.lower()
+
+    # 1. Hardcoded aliases for known LLM mistakes
+    if bad_lower in _FIELD_ALIASES:
+        return _FIELD_ALIASES[bad_lower]
+
+    known_fields = _get_known_fields()
+
+    # 2. Exact case-insensitive match
     for known in known_fields:
         if known.lower() == bad_lower:
             return known
 
-    # Partial match on the leaf component
+    # 3. Partial match on the leaf component
     bad_parts = bad_lower.split(".")
     if len(bad_parts) >= 2:
         bad_leaf   = bad_parts[-1]

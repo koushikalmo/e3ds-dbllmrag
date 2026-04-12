@@ -284,6 +284,86 @@ BOOTSTRAP_EXAMPLES = [
         "result_count": 18,
         "db_hint": "stream",
     },
+    {
+        "question": "Which owners had sessions this month and what is their subscription limit?",
+        "query": {
+            "queryType": "dual",
+            "queries": [
+                {
+                    "database":   "stream-datastore",
+                    "collection": "Apr_2025",
+                    "pipeline": [
+                        {"$match": {"e3ds_employee": False}},
+                        {"$group": {
+                            "_id":      "$appInfo.owner",
+                            "sessions": {"$sum": 1},
+                            "avgLoad":  {"$avg": "$loadTime"},
+                        }},
+                        {"$sort": {"sessions": -1}},
+                        {"$limit": 50},
+                    ],
+                },
+                {
+                    "database":   "appConfigs",
+                    "collection": "eduardo",
+                    "pipeline": [
+                        {"$match": {"_id": "usersinfo"}},
+                        {"$project": {
+                            "maxUserLimit": 1,
+                            "SubscriptionEndDate._seconds": 1,
+                            "apiKeys.apiKey": 0,
+                            "streamingApiKeys.apiKey": 0,
+                        }},
+                    ],
+                },
+            ],
+            "mergeKey":    "owner",
+            "explanation": "Gets session counts from stream-datastore, merges with subscription limits from appConfigs.",
+            "resultLabel": "Owner Sessions + Subscription Limits",
+        },
+        "result_count": 20,
+        "db_hint": "both",
+    },
+    {
+        "question": "Show active subscriptions with sessions count for each owner",
+        "query": {
+            "queryType": "dual",
+            "queries": [
+                {
+                    "database":   "stream-datastore",
+                    "collection": "Apr_2025",
+                    "pipeline": [
+                        {"$match": {"e3ds_employee": False}},
+                        {"$group": {
+                            "_id":      "$appInfo.owner",
+                            "sessions": {"$sum": 1},
+                        }},
+                        {"$sort": {"sessions": -1}},
+                        {"$limit": 50},
+                    ],
+                },
+                {
+                    "database":   "appConfigs",
+                    "collection": "eduardo",
+                    "pipeline": [
+                        {"$match": {"_id": "usersinfo"}},
+                        {"$project": {
+                            "maxUserLimit": 1,
+                            "SubscriptionEndDate._seconds": 1,
+                            "SubscriptionStartDate._seconds": 1,
+                            "apiKeys.apiKey": 0,
+                            "streamingApiKeys.apiKey": 0,
+                        }},
+                    ],
+                },
+            ],
+            "mergeKey":    "owner",
+            "explanation": "Counts sessions per owner and joins with subscription data from appConfigs.",
+            "resultLabel": "Sessions + Subscription Status",
+        },
+        "result_count": 15,
+        "db_hint": "both",
+    },
 ]
 
 

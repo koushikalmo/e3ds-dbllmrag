@@ -73,6 +73,14 @@ STREAM-DATASTORE RULES
 - webRtcStatsData.avgRoundTripTime is stored as a STRING:
     Always convert before sorting/comparing: { "$toDouble": "$webRtcStatsData.avgRoundTripTime" }
 
+CRITICAL FIELD NAMES (use exactly as shown — wrong names return 0 results):
+- Country:  "clientInfo.country_name"  ← full name like "Brazil". NEVER use "country_code".
+- City:     "clientInfo.city"
+- OS:       "userDeviceInfo.os.name"
+- Browser:  "userDeviceInfo.client.name"
+- Owner:    "appInfo.owner"
+- App:      "appInfo.appName"
+
 ═══════════════════════════════════════════════
 APPCONFIGS RULES — READ CAREFULLY
 ═══════════════════════════════════════════════
@@ -110,6 +118,23 @@ Join key:
 For dual queries: the backend runs both pipelines concurrently and merges in Python.
 Stream query should group by appInfo.owner.
 AppConfigs query should set collection = the owner's username.
+
+DUAL QUERY REQUIRED FIELDS — every sub-query MUST have all three:
+  "database":   "stream-datastore" or "appConfigs"   ← REQUIRED
+  "collection": "<month>" or "<owner username>"       ← REQUIRED
+  "pipeline":   [ ...stages... ]                      ← REQUIRED
+
+Example dual query structure:
+{
+  "queryType": "dual",
+  "queries": [
+    { "database": "stream-datastore", "collection": "Apr_2025", "pipeline": [...] },
+    { "database": "appConfigs",       "collection": "eduardo",  "pipeline": [...] }
+  ],
+  "mergeKey": "owner",
+  "explanation": "...",
+  "resultLabel": "..."
+}
 """
 
 

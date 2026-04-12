@@ -564,11 +564,36 @@ async def retrieve_schema_context(
     from lib.vector_store import VectorStore
 
     schema_store = VectorStore("schema")
+
+    # ── Static fallback for appConfigs ─────────────────────────
+    # If the vector store is empty (cold start before embeddings
+    # are ready) AND the question needs appConfigs, inject the
+    # critical appConfigs field list directly. Without this, the
+    # LLM has no field context for the second database and dual
+    # queries fail every time.
+    _APPCONFIGS_STATIC = (
+        "  appConfigs fields (each owner collection has these in the 'usersinfo' document):\n"
+        "  maxUserLimit (integer): max concurrent users allowed for this owner\n"
+        "  SubscriptionEndDate._seconds (integer): Unix timestamp of subscription expiry\n"
+        "  SubscriptionStartDate._seconds (integer): Unix timestamp when subscription began\n"
+        "  paidMinutes (number): total streaming minutes purchased\n"
+        "  paidSecondsUsage (number): streaming seconds used so far\n"
+        "  shouldAutoRenew (boolean): whether subscription auto-renews\n"
+        "  products.ccu (number): concurrent user product limit\n"
+        "  products.gb (number): bandwidth GB product\n"
+        "  NOTE: In appConfigs each collection = one owner username (e.g. 'eduardo').\n"
+        "  Query _id='usersinfo' for billing data. NEVER use 'users' as a collection name."
+    )
+
     if schema_store.count() == 0:
+        if include_appconfigs:
+            return _APPCONFIGS_STATIC
         return ""   # not indexed yet — caller falls back to static rules
 
     q_emb = await embed(question)
     if q_emb is None:
+        if include_appconfigs:
+            return _APPCONFIGS_STATIC
         return ""   # embedding unavailable — caller falls back
 
     # Filter to only the relevant database(s)
@@ -580,9 +605,19 @@ async def retrieve_schema_context(
 
     results = schema_store.search(q_emb, top_k=top_k, filter_fn=_filter, min_score=0.3)
     if not results:
+        if include_appconfigs:
+            return _APPCONFIGS_STATIC
         return ""
 
     lines = [f"  {r['text']}" for r in results]
+    # If appConfigs was requested but no appConfigs results came back from
+    # the vector store, append the static fallback so the LLM always has
+    # field context for the second database.
+    if include_appconfigs and not any(
+        r["metadata"].get("db") == "appConfigs" for r in results
+    ):
+        lines.append(_APPCONFIGS_STATIC)
+
     return "\n".join(lines)
 
 
