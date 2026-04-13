@@ -238,5 +238,37 @@ async def generate_with_ollama(
     return text, provider.name
 
 
+async def warmup_model() -> None:
+    """
+    Loads the query generation model into Ollama's memory.
+
+    Called once at server startup so the first real user query
+    doesn't have to wait 60-90s for the 4GB model to load from disk.
+    Uses a minimal prompt — the goal is just to trigger model loading,
+    not to produce useful output.
+
+    Failure is non-fatal: if Ollama is offline or the model isn't
+    pulled, this silently does nothing. The query endpoint will show
+    a proper error when the user actually submits a query.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            r = await client.post(
+                f"{OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model":      OLLAMA_MODEL,
+                    "prompt":     "hi",
+                    "stream":     False,
+                    "keep_alive": "10m",   # keep loaded for 10 minutes
+                },
+            )
+        if r.status_code == 200:
+            print(f"[llm] Model '{OLLAMA_MODEL}' warmed up and ready.")
+        else:
+            print(f"[llm] Warmup returned HTTP {r.status_code} — model may still be loading.")
+    except Exception as e:
+        print(f"[llm] Warmup skipped: {e}")
+
+
 # Backward-compatible alias — query_generator.py calls this name
 generate_with_fallback = generate_with_ollama

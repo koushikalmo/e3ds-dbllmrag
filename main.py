@@ -37,7 +37,7 @@ from lib.mongodb           import close_connections, ping_databases
 from lib.query_generator   import generate_query, save_successful_query
 from lib.query_executor    import execute_query
 from lib.result_summarizer import summarize_results
-from lib.llm_provider      import OllamaProvider, OLLAMA_MODEL
+from lib.llm_provider      import OllamaProvider, OLLAMA_MODEL, warmup_model
 from lib.schema_discovery  import refresh_schema_cache, get_cache_status
 from lib.query_examples    import get_example_count
 from lib.chat_history      import save_query, get_history, delete_entry, clear_all
@@ -70,6 +70,10 @@ async def lifespan(app: FastAPI):
     # vector store so semantic search is ready from the first query.
     # No-op if embeddings are unavailable — keyword search is used instead.
     asyncio.create_task(index_all_examples_async())
+
+    # Pre-warm the query LLM so the first user query doesn't stall
+    # waiting for the 4GB model to load from disk (60-90s cold-start).
+    asyncio.create_task(warmup_model())
 
     yield
 

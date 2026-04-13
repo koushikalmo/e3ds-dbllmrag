@@ -170,6 +170,11 @@
     }
     .btn-run:hover:not(:disabled) { background: #bf5200; }
     .btn-run:disabled { background: var(--border2); color: var(--dim); }
+    .btn-stop {
+      background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b;
+      font-weight: 700; letter-spacing: .04em;
+    }
+    .btn-stop:hover { background: #991b1b; color: #fff; border-color: #b91c1c; }
     .hint { color: var(--dimmer); font-size: 10px; }
 
     /* ── Loading ─────────────────────────────────────────────── */
@@ -368,6 +373,7 @@
           </div>
           <div class="input-bar-right">
             <span class="hint">↵ ENTER · SHIFT+↵ for newline</span>
+            <button class="btn btn-stop" id="stopBtn" style="display:none;" title="Cancel the running query">■ STOP</button>
             <button class="btn btn-run" id="runBtn">RUN QUERY →</button>
           </div>
         </div>
@@ -489,6 +495,8 @@ let currentPage    = 1;
 let isListening    = false;
 let recognition    = null;
 let isAnalyzing    = false;
+let activeAbort    = null;   // AbortController for the in-flight /api/query fetch
+let _timedOut      = false;  // true when the safetyTimer fired (vs user clicking STOP)
 
 // ── Session ID for conversation context ───────────────────────
 // Generated once per page load. Sent with every query so the
@@ -501,6 +509,7 @@ const SESSION_ID = crypto.randomUUID();
 // ── DOM refs ──────────────────────────────────────────────────
 const questionInput   = document.getElementById("questionInput");
 const runBtn          = document.getElementById("runBtn");
+const stopBtn         = document.getElementById("stopBtn");
 const voiceBtn        = document.getElementById("voiceBtn");
 const voiceDot        = document.getElementById("voiceDot");
 const voiceLabel      = document.getElementById("voiceLabel");
@@ -573,6 +582,7 @@ questionInput.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitQuery(); }
 });
 runBtn.addEventListener("click", submitQuery);
+stopBtn.addEventListener("click", () => { if (activeAbort) activeAbort.abort(); });
 
 
 // ── Tab switching ─────────────────────────────────────────────
@@ -677,6 +687,18 @@ async function submitQuery(overrideQuestion) {
       loadingText.textContent = "Running query against MongoDB…";
   }, 3000);
 
+  // AbortController lets the STOP button cancel the in-flight request.
+  _timedOut   = false;
+  activeAbort = new AbortController();
+
+  // Safety net: if a query takes more than 120s (Ollama cold-start can take
+  // 60-90s to load the model into VRAM on first run) the fetch may never
+  // resolve. Reset loading state so the button doesn't stay permanently disabled.
+  const safetyTimer = setTimeout(() => {
+    _timedOut = true;
+    if (activeAbort) activeAbort.abort();
+  }, 120_000);
+
   // Hide any previous analysis
   analysisBar.style.display = "none";
 
@@ -685,6 +707,7 @@ async function submitQuery(overrideQuestion) {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ question: q, collection: collectionSelect.value, session_id: SESSION_ID }),
+      signal:  activeAbort.signal,
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || "Query failed");
@@ -713,8 +736,18 @@ async function submitQuery(overrideQuestion) {
     renderResults(data.data);
 
   } catch (err) {
-    showPanel("error", err.message);
+    if (err.name === "AbortError") {
+      if (_timedOut) {
+        showPanel("error", "Query timed out. Ollama may be loading the model (first query takes 60-90s). Please try again.");
+      } else {
+        showPanel("empty");   // user clicked STOP — go back to idle, no error
+      }
+    } else {
+      showPanel("error", err.message);
+    }
   } finally {
+    clearTimeout(safetyTimer);
+    activeAbort = null;
     setLoading(false);
   }
 }
@@ -736,6 +769,8 @@ function showPanel(which, msg = "") {
 function setLoading(on) {
   runBtn.disabled = voiceBtn.disabled = questionInput.disabled = on;
   runBtn.textContent = on ? "QUERYING…" : "RUN QUERY →";
+  runBtn.style.display  = on ? "none"  : "";
+  stopBtn.style.display = on ? ""      : "none";
 }
 
 
