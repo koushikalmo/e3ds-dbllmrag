@@ -43,6 +43,7 @@ from lib.query_examples    import get_example_count
 from lib.chat_history      import save_query, get_history, delete_entry, clear_all
 from lib.query_examples    import index_all_examples_async
 from lib.session_memory    import add_turn, get_context_text, clear_session, active_session_count
+from lib.collection_resolver import resolve_and_log
 
 
 @asynccontextmanager
@@ -204,9 +205,15 @@ async def run_query(body: QueryRequest):
         # Empty string for first query in a session or stateless mode.
         conversation_ctx = get_context_text(body.session_id)
 
+        # Auto-detect month/year from the question and resolve to
+        # the correct collection name (e.g. "October 2025" → "Oct_2025").
+        # Falls back to body.collection if no date is mentioned.
+        default_col = body.collection or os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2026")
+        collection  = resolve_and_log(body.question.strip(), default_col)
+
         query_obj = await generate_query(
             question         = body.question.strip(),
-            collection       = body.collection,
+            collection       = collection,
             conversation_ctx = conversation_ctx,
         )
 
@@ -246,7 +253,7 @@ async def run_query(body: QueryRequest):
             # completes, which can hang the browser request for minutes.
             asyncio.create_task(save_query(
                 question        = body.question.strip(),
-                collection      = body.collection,
+                collection      = collection,
                 result_count    = result_count,
                 result_label    = query_obj.get("resultLabel", ""),
                 explanation     = query_obj.get("explanation", ""),
@@ -259,7 +266,7 @@ async def run_query(body: QueryRequest):
                 **result,
                 "meta": {
                     "question":       body.question.strip(),
-                    "collectionUsed": body.collection,
+                    "collectionUsed": collection,
                     "elapsedSeconds": elapsed,
                     "generatedAt":    time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 },

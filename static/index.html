@@ -11,23 +11,24 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #ffffff;
-      --bg2: #f6f7f9;
-      --bg3: #eef0f3;
-      --border: #dde1e7;
+      --bg:      #ffffff;
+      --bg2:     #f6f7f9;
+      --bg3:     #eef0f3;
+      --border:  #dde1e7;
       --border2: #c8cdd6;
-      --text: #111827;
-      --dim: #6b7280;
-      --dimmer: #9ca3af;
-      --accent: #d95f00;
+      --text:    #111827;
+      --dim:     #6b7280;
+      --dimmer:  #9ca3af;
+      --accent:  #d95f00;
       --accent2: #f97316;
-      --green: #16a34a;
-      --red: #dc2626;
-      --blue: #2563eb;
-      --yellow: #b45309;
-      --purple: #7c3aed;
-      --mono: 'JetBrains Mono', 'Courier New', monospace;
+      --green:   #16a34a;
+      --red:     #dc2626;
+      --blue:    #2563eb;
+      --yellow:  #b45309;
+      --purple:  #7c3aed;
+      --mono:    'JetBrains Mono', 'Courier New', monospace;
       --display: 'Syne', sans-serif;
+      --sidebar: 260px;
     }
 
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--mono); overflow: hidden; }
@@ -38,36 +39,25 @@
     ::-webkit-scrollbar-thumb:hover { background: #a0a8b4; }
 
     @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.3} }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
     @keyframes spin   { to{transform:rotate(360deg)} }
+    @keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0} }
 
-    #app { display: grid; grid-template-rows: 52px 1fr; height: 100vh; }
+    /* ── App shell ───────────────────────────────────────────── */
+    #app { display: flex; flex-direction: column; height: 100vh; }
 
     /* ── Header ──────────────────────────────────────────────── */
     header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 1.5rem; border-bottom: 1px solid var(--border);
-      background: var(--bg); gap: 1rem;
+      padding: 0 1.25rem 0 1rem; border-bottom: 1px solid var(--border);
+      background: var(--bg); gap: 1rem; height: 52px; flex-shrink: 0;
       box-shadow: 0 1px 3px rgba(0,0,0,.06);
     }
     .logo { display: flex; align-items: center; gap: .75rem; }
     .logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 7px rgba(217,95,0,.35); }
-    .logo-text { font-family: var(--display); font-size: 1rem; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+    .logo-text { font-family: var(--display); font-size: 1rem; font-weight: 800; letter-spacing: -.02em; }
     .logo-text span { color: var(--accent); }
-
-    .header-right { display: flex; align-items: center; gap: 1.25rem; flex-shrink: 0; }
-
-    .collection-wrap { display: flex; align-items: center; gap: .5rem; }
-    .collection-label { color: var(--dimmer); font-size: 10px; letter-spacing: .12em; }
-    select {
-      background: var(--bg); color: var(--accent); border: 1px solid var(--border2);
-      padding: 3px 7px; border-radius: 4px; font-size: 11px; font-family: var(--mono);
-      cursor: pointer; outline: none;
-    }
-    select:hover { border-color: var(--accent); }
-    select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(217,95,0,.15); }
-
-    /* LLM provider badge */
+    .header-right { display: flex; align-items: center; gap: 1.25rem; }
     .llm-badge {
       display: flex; align-items: center; gap: 5px;
       font-size: 10px; padding: 3px 8px; border-radius: 4px;
@@ -77,146 +67,148 @@
     .llm-badge.cloud  { color: #1d4ed8; border-color: #93c5fd; background: #eff6ff; }
     .llm-badge.error  { color: var(--red); border-color: #fca5a5; background: #fef2f2; }
     .llm-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
-
     .status { display: flex; align-items: center; gap: 5px; color: var(--dim); font-size: 10px; }
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
 
-    /* ── Body layout ─────────────────────────────────────────── */
-    .body { display: grid; grid-template-columns: 1fr 280px; overflow: hidden; }
+    /* ── Workspace ───────────────────────────────────────────── */
+    .workspace { display: flex; flex: 1; overflow: hidden; }
 
-    /* ── History panel (right) ───────────────────────────────── */
-    .history-panel {
-      border-left: 1px solid var(--border); background: var(--bg2);
-      overflow-y: auto; display: flex; flex-direction: column;
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar); flex-shrink: 0;
+      background: var(--bg2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
     }
-    .history-panel-head {
-      position: sticky; top: 0; background: var(--bg2); z-index: 2;
-      padding: .875rem 1rem .6rem; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
+    .sidebar-top {
+      padding: .75rem .75rem .5rem; flex-shrink: 0;
     }
-    .history-panel-title {
-      font-size: 9px; letter-spacing: .15em; color: var(--dimmer); font-weight: 600;
+    .new-chat-btn {
+      width: 100%; background: var(--accent); color: #fff; border: none;
+      padding: .6rem .875rem; border-radius: 6px; font-family: var(--mono);
+      font-size: 11px; font-weight: 700; letter-spacing: .06em; cursor: pointer;
+      transition: background .15s; display: flex; align-items: center; gap: 6px;
     }
-    .btn-clear {
-      background: none; border: none; color: var(--dimmer); font-family: var(--mono);
-      font-size: 9px; letter-spacing: .08em; cursor: pointer; padding: 2px 6px;
-      border-radius: 3px; transition: all .15s;
+    .new-chat-btn:hover { background: #bf5200; }
+    .sidebar-sessions { flex: 1; overflow-y: auto; padding: .25rem .5rem .75rem; }
+    .sidebar-date-group { margin-bottom: .5rem; }
+    .sidebar-date-label {
+      font-size: 9px; letter-spacing: .12em; color: var(--dimmer);
+      padding: .5rem .5rem .25rem; display: block;
     }
-    .btn-clear:hover { color: var(--red); background: #fef2f2; }
-    .history-list { padding: .5rem .625rem; flex: 1; }
-    .history-item {
-      display: block; width: 100%; text-align: left; background: none; border: none;
-      padding: .625rem .625rem; margin-bottom: 2px; cursor: pointer; font-family: var(--mono);
-      border-radius: 5px; border-left: 2px solid transparent; transition: all .15s;
-      position: relative;
+    .session-item {
+      display: block; width: 100%; background: none; border: none;
+      text-align: left; padding: .55rem .65rem; border-radius: 5px;
+      cursor: pointer; font-family: var(--mono); transition: background .12s;
+      position: relative; margin-bottom: 1px;
     }
-    .history-item:hover { background: rgba(0,0,0,.05); border-left-color: var(--accent); }
-    .history-item:hover .history-del { opacity: 1; }
-    .history-item-time { color: var(--dimmer); font-size: 9px; display: block; margin-bottom: 3px; letter-spacing: .04em; }
-    .history-item-q {
-      color: var(--text); font-size: 10.5px; line-height: 1.45; display: -webkit-box;
-      -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    .session-item:hover { background: rgba(0,0,0,.06); }
+    .session-item.active { background: var(--bg3); border-left: 2px solid var(--accent); }
+    .session-item:hover .session-del { opacity: 1; }
+    .session-title {
+      display: block; font-size: 11px; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      padding-right: 20px;
     }
-    .history-item-meta { color: var(--dimmer); font-size: 9px; display: block; margin-top: 3px; }
-    .history-del {
-      position: absolute; top: .4rem; right: .4rem; background: none; border: none;
-      color: var(--dimmer); font-size: 13px; cursor: pointer; opacity: 0;
-      transition: opacity .15s, color .15s; line-height: 1; padding: 1px 4px;
-      border-radius: 3px;
+    .session-meta {
+      display: block; font-size: 9px; color: var(--dimmer); margin-top: 2px;
     }
-    .history-del:hover { color: var(--red); background: #fef2f2; }
-    .history-empty {
-      color: var(--dimmer); font-size: 11px; text-align: center;
-      padding: 2.5rem 1rem; line-height: 1.8;
+    .session-del {
+      position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--dimmer); font-size: 14px;
+      cursor: pointer; opacity: 0; transition: opacity .12s, color .12s;
+      padding: 2px 5px; border-radius: 3px; line-height: 1;
+    }
+    .session-del:hover { color: var(--red); background: #fef2f2; }
+    .sidebar-empty {
+      text-align: center; padding: 2rem .75rem;
+      color: var(--dimmer); font-size: 11px; line-height: 1.9;
     }
 
-    /* ── Main content ────────────────────────────────────────── */
-    main { display: flex; flex-direction: column; overflow: hidden; padding: 1.5rem; gap: 1rem; background: var(--bg); }
+    /* ── Chat area ───────────────────────────────────────────── */
+    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
 
-    /* ── Input ──────────────────────────────────────────────── */
-    .input-wrap {
-      border: 1px solid var(--border2); border-radius: 6px; overflow: hidden;
-      transition: border-color .2s, box-shadow .2s; flex-shrink: 0;
-      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    /* ── Messages scroll container ───────────────────────────── */
+    .messages-wrap { flex: 1; overflow-y: auto; }
+    .messages {
+      max-width: 860px; margin: 0 auto; padding: 1.75rem 1.5rem 1rem;
+      display: flex; flex-direction: column; gap: 1.75rem;
     }
-    .input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,95,0,.12); }
-    .input-wrap.listening    { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,95,0,.18); }
-    textarea {
-      width: 100%; background: var(--bg); color: var(--text); border: none; outline: none;
-      padding: .9rem 1.1rem; font-size: 13px; font-family: var(--mono); resize: none; line-height: 1.6;
-    }
-    textarea::placeholder { color: var(--dimmer); }
-    textarea:disabled { opacity: .5; background: var(--bg2); }
-    .input-bar {
-      background: var(--bg2); border-top: 1px solid var(--border); padding: .5rem .875rem;
-      display: flex; align-items: center; justify-content: space-between; gap: .5rem;
-    }
-    .input-bar-left  { display: flex; align-items: center; gap: .5rem; }
-    .input-bar-right { display: flex; align-items: center; gap: .5rem; }
 
-    .btn {
-      background: var(--bg); border: 1px solid var(--border2); color: var(--dim);
-      padding: 4px 11px; border-radius: 4px; font-family: var(--mono); font-size: 11px;
-      cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 5px;
+    /* ── Welcome state ───────────────────────────────────────── */
+    .welcome-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      flex: 1; padding: 3rem 2rem; text-align: center;
     }
-    .btn:hover:not(:disabled) { border-color: var(--dim); color: var(--text); background: var(--bg3); }
-    .btn:disabled { opacity: .4; cursor: default; }
-    .btn-voice.active { background: #fff7ed; border-color: var(--accent); color: var(--accent); }
-    .voice-dot { font-size: 10px; }
-    .voice-dot.pulse { animation: pulse .8s infinite; }
-    .btn-run {
-      background: var(--accent); color: #fff; border: none;
-      font-weight: 700; letter-spacing: .04em;
+    .welcome-glyph { font-family: var(--display); font-size: 3.5rem; color: var(--border); letter-spacing: -.05em; user-select: none; }
+    .welcome-sub   { color: var(--dimmer); font-size: 12px; margin: .75rem 0 1.5rem; line-height: 1.7; }
+    .example-chips { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; max-width: 600px; }
+    .example-chip {
+      background: var(--bg2); border: 1px solid var(--border2); color: var(--dim);
+      padding: .45rem .875rem; border-radius: 20px; font-family: var(--mono);
+      font-size: 11px; cursor: pointer; transition: all .15s;
     }
-    .btn-run:hover:not(:disabled) { background: #bf5200; }
-    .btn-run:disabled { background: var(--border2); color: var(--dim); }
-    .btn-stop {
-      background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b;
-      font-weight: 700; letter-spacing: .04em;
-    }
-    .btn-stop:hover { background: #991b1b; color: #fff; border-color: #b91c1c; }
-    .hint { color: var(--dimmer); font-size: 10px; }
+    .example-chip:hover { background: var(--bg3); border-color: var(--accent); color: var(--accent); }
 
-    /* ── Loading ─────────────────────────────────────────────── */
-    .loading { display: flex; align-items: center; gap: .875rem; color: var(--dim); font-size: 11px; flex-shrink: 0; }
-    .loading-dots { display: flex; gap: 4px; }
-    .loading-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+    /* ── Individual message ──────────────────────────────────── */
+    .msg { animation: fadeUp .2s ease; }
 
-    /* ── Error ───────────────────────────────────────────────── */
-    .error-box {
-      background: #fef2f2; border: 1px solid #fca5a5; border-radius: 5px;
-      padding: .875rem 1.1rem; color: #991b1b; font-size: 12px; flex-shrink: 0;
+    /* User bubble */
+    .msg-user {
+      display: flex; justify-content: flex-end; gap: .75rem; align-items: flex-end;
     }
-    .error-label { color: var(--red); font-weight: 700; }
+    .msg-user-bubble {
+      background: var(--accent); color: #fff; border-radius: 16px 16px 4px 16px;
+      padding: .75rem 1.1rem; font-size: 13px; line-height: 1.6;
+      max-width: 75%; word-break: break-word;
+      box-shadow: 0 1px 3px rgba(217,95,0,.25);
+    }
+    .msg-user-avatar {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--bg3);
+      border: 1px solid var(--border2); display: flex; align-items: center;
+      justify-content: center; font-size: 11px; color: var(--dim); flex-shrink: 0;
+    }
 
-    /* ── Results panel ───────────────────────────────────────── */
-    .results-panel {
-      border: 1px solid var(--border); border-radius: 6px;
-      display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0;
-      animation: fadeUp .25s ease; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    /* Assistant response */
+    .msg-assistant { display: flex; gap: .75rem; align-items: flex-start; }
+    .msg-assistant-avatar {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #fff; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+      box-shadow: 0 1px 4px rgba(217,95,0,.3);
     }
-    .results-header {
+    .msg-assistant-body { flex: 1; min-width: 0; }
+
+    /* Loading dots */
+    .msg-loading-dots {
+      display: flex; gap: 5px; padding: .6rem 0; align-items: center;
+    }
+    .msg-loading-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+    }
+    .msg-loading-text { color: var(--dim); font-size: 11px; margin-left: .5rem; }
+
+    /* Error inline */
+    .msg-error-card {
+      background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;
+      padding: .875rem 1.1rem; color: #991b1b; font-size: 12px; line-height: 1.6;
+    }
+    .msg-error-label { font-weight: 700; color: var(--red); }
+
+    /* Result card */
+    .result-card {
+      border: 1px solid var(--border); border-radius: 8px;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .result-card-header {
       background: var(--bg2); border-bottom: 1px solid var(--border);
-      padding: .6rem 1.1rem; display: flex; align-items: center;
-      justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: .5rem;
+      padding: .6rem 1rem; display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: .5rem;
     }
-    .results-header-left { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-    .results-label { color: var(--accent); font-weight: 700; font-size: 12px; }
-    .results-meta  { color: var(--dimmer); font-size: 11px; }
-
-    /* ANALYZE button */
-    .btn-analyze {
-      background: none; border: 1px solid #c4b5fd; color: var(--purple);
-      padding: 3px 10px; border-radius: 4px; font-family: var(--mono);
-      font-size: 10px; cursor: pointer; letter-spacing: .04em; transition: all .15s;
-    }
-    .btn-analyze:hover:not(:disabled) { background: #f5f3ff; border-color: var(--purple); }
-    .btn-analyze:disabled { opacity: .4; cursor: default; }
-    .btn-analyze.analyzing {
-      background: #f5f3ff; border-color: var(--purple);
-      animation: pulse 1.2s infinite;
-    }
-
+    .result-card-header-left { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .result-label { color: var(--accent); font-weight: 700; font-size: 12px; }
+    .result-meta  { color: var(--dimmer); font-size: 11px; }
+    .result-card-header-right { display: flex; align-items: center; gap: .5rem; }
     .view-tabs { display: flex; gap: 3px; }
     .tab-btn {
       background: none; border: 1px solid var(--border); color: var(--dimmer);
@@ -225,28 +217,41 @@
     }
     .tab-btn.active { background: var(--bg); color: var(--text); border-color: var(--border2); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .tab-btn:hover:not(.active) { color: var(--dim); background: var(--bg3); }
-
+    .btn-analyze {
+      background: none; border: 1px solid #c4b5fd; color: var(--purple);
+      padding: 3px 10px; border-radius: 4px; font-family: var(--mono);
+      font-size: 10px; cursor: pointer; letter-spacing: .04em; transition: all .15s;
+    }
+    .btn-analyze:hover:not(:disabled) { background: #f5f3ff; border-color: var(--purple); }
+    .btn-analyze:disabled { opacity: .4; cursor: default; }
+    .btn-analyze.analyzing { background: #f5f3ff; border-color: var(--purple); animation: pulse 1.2s infinite; }
     .explanation-bar {
       background: #fffbf5; border-bottom: 1px solid #fde6c4;
-      padding: .4rem 1.1rem; color: #92400e; font-size: 10px; flex-shrink: 0;
+      padding: .4rem 1rem; color: #92400e; font-size: 10px;
     }
     .explanation-arrow { color: var(--accent2); margin-right: .35rem; }
-
-    /* Analysis result panel */
     .analysis-bar {
       background: #f5f3ff; border-bottom: 1px solid #c4b5fd;
-      padding: .75rem 1.1rem; color: #4c1d95;
-      font-size: 12px; line-height: 1.7; flex-shrink: 0;
+      padding: .75rem 1rem; color: #4c1d95; font-size: 12px; line-height: 1.7;
       max-height: 200px; overflow-y: auto;
     }
     .analysis-label { color: var(--purple); font-size: 10px; font-weight: 700; letter-spacing: .1em; display: block; margin-bottom: .4rem; }
     .analysis-meta  { color: #7c3aed; font-size: 9px; margin-top: .4rem; opacity: .7; }
-
-    /* ── Pagination bar ──────────────────────────────────────── */
+    .copy-bar {
+      display: flex; justify-content: flex-end; padding: .5rem .875rem;
+      border-bottom: 1px solid var(--border); background: var(--bg2);
+    }
+    .btn-copy {
+      background: var(--bg); border: 1px solid var(--border2); color: var(--dim);
+      padding: 4px 11px; border-radius: 4px; font-family: var(--mono); font-size: 11px;
+      cursor: pointer; transition: all .15s;
+    }
+    .btn-copy:hover { border-color: var(--dim); color: var(--text); background: var(--bg3); }
+    .result-body { overflow: auto; max-height: 420px; background: var(--bg); }
     .pagination-bar {
       background: var(--bg2); border-top: 1px solid var(--border);
       padding: .4rem .875rem; display: flex; align-items: center; justify-content: space-between;
-      flex-shrink: 0; font-size: 11px; color: var(--dimmer);
+      font-size: 11px; color: var(--dimmer);
     }
     .page-btn {
       background: var(--bg); border: 1px solid var(--border); color: var(--dim);
@@ -255,9 +260,6 @@
     }
     .page-btn:hover:not(:disabled) { border-color: var(--border2); color: var(--text); background: var(--bg3); }
     .page-btn:disabled { opacity: .3; cursor: default; }
-    .page-info { color: var(--dimmer); font-size: 10px; }
-
-    .results-body { overflow: auto; flex: 1; background: var(--bg); }
 
     /* ── Table ───────────────────────────────────────────────── */
     .results-table { width: 100%; border-collapse: collapse; font-size: 11px; }
@@ -276,599 +278,831 @@
     .val-bool-false { color: var(--red); }
     .val-number     { color: var(--blue); font-variant-numeric: tabular-nums; }
     .val-null       { color: var(--dimmer); font-style: italic; }
-
-    /* ── Code views (kept dark — standard for code blocks) ───── */
     .code-view {
       background: #1e1e2e; color: #cdd6f4; padding: 1.25rem; font-size: 11px;
-      font-family: var(--mono); overflow: auto; height: 100%; white-space: pre;
+      font-family: var(--mono); overflow: auto; white-space: pre; min-height: 100px;
     }
     .pipeline-view { color: #89b4fa; }
-    .copy-bar {
-      display: flex; justify-content: flex-end; padding: .5rem .875rem;
-      border-bottom: 1px solid var(--border); background: var(--bg2); flex-shrink: 0;
-    }
 
-    /* ── Empty state ─────────────────────────────────────────── */
-    .empty-state {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      border: 1px dashed var(--border); border-radius: 6px; background: var(--bg);
+    /* ── Input dock (fixed at bottom) ────────────────────────── */
+    .input-dock {
+      flex-shrink: 0; padding: .875rem 1.5rem 1.25rem;
+      background: var(--bg); border-top: 1px solid var(--border);
     }
-    .empty-glyph { font-family: var(--display); font-size: 4rem; color: var(--border); letter-spacing: -.05em; user-select: none; }
-    .empty-hint  { color: var(--dimmer); font-size: 11px; line-height: 2; margin-top: .75rem; text-align: center; }
+    .input-outer {
+      max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: .4rem;
+    }
+    .input-wrap {
+      border: 1px solid var(--border2); border-radius: 12px; overflow: hidden;
+      transition: border-color .2s, box-shadow .2s;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      display: flex; align-items: flex-end; background: var(--bg);
+    }
+    .input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,95,0,.12); }
+    .input-wrap.listening    { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(217,95,0,.18); }
+    textarea {
+      flex: 1; background: transparent; color: var(--text); border: none; outline: none;
+      padding: .875rem 1rem; font-size: 13px; font-family: var(--mono); resize: none;
+      line-height: 1.6; max-height: 180px; overflow-y: auto; min-height: 48px;
+    }
+    textarea::placeholder { color: var(--dimmer); }
+    textarea:disabled { opacity: .5; }
+    .input-actions {
+      display: flex; align-items: flex-end; gap: 4px; padding: .5rem .6rem;
+      flex-shrink: 0;
+    }
+    .btn-icon {
+      width: 34px; height: 34px; border-radius: 8px; border: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all .15s; flex-shrink: 0;
+    }
+    .btn-voice {
+      background: var(--bg2); color: var(--dim); border: 1px solid var(--border2);
+    }
+    .btn-voice:hover { background: var(--bg3); color: var(--text); }
+    .btn-voice.active { background: #fff7ed; border-color: var(--accent); color: var(--accent); }
+    .btn-voice:disabled { opacity: .4; cursor: default; }
+    .btn-send {
+      background: var(--accent); color: #fff;
+    }
+    .btn-send:hover:not(:disabled) { background: #bf5200; }
+    .btn-send:disabled { background: var(--border2); color: var(--dim); cursor: default; }
+    .btn-stop-inline {
+      background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b;
+      width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; transition: all .15s;
+    }
+    .btn-stop-inline:hover { background: #991b1b; color: #fff; }
+    .input-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 .25rem; max-width: 860px;
+    }
+    .input-footer-hint { color: var(--dimmer); font-size: 10px; }
+    .listening-hint { color: var(--accent); font-size: 11px; animation: pulse 1s infinite; }
   </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- ── HEADER ──────────────────────────────────────────────── -->
+  <!-- ── HEADER ─────────────────────────────────────────────── -->
   <header>
     <div class="logo">
       <div class="logo-dot"></div>
       <div class="logo-text">EAGLE 3DS <span>QUERY</span></div>
     </div>
     <div class="header-right">
-      <div class="collection-wrap">
-        <span class="collection-label">COLLECTION</span>
-        <select id="collectionSelect">
-          <option value="Apr_2026">April 2026</option>
-          <option value="Mar_2026">March 2026</option>
-          <option value="Feb_2026">February 2026</option>
-          <option value="Jan_2026">January 2026</option>
-          <option value="Dec_2025">December 2025</option>
-          <option value="Nov_2025">November 2025</option>
-          <option value="Oct_2025">October 2025</option>
-          <option value="Sep_2025">September 2025</option>
-          <option value="Aug_2025">August 2025</option>
-          <option value="Jul_2025">July 2025</option>
-          <option value="Jun_2025">June 2025</option>
-          <option value="May_2025">May 2025</option>
-          <option value="Apr_2025">April 2025</option>
-          <option value="Mar_2025">March 2025</option>
-          <option value="Feb_2025">February 2025</option>
-          <option value="Jan_2025">January 2025</option>
-          <option value="Dec_2024">December 2024</option>
-          <option value="Nov_2024">November 2024</option>
-          <option value="Oct_2024">October 2024</option>
-          <option value="Sep_2024">September 2024</option>
-          <option value="Aug_2024">August 2024</option>
-          <option value="Jul_2024">July 2024</option>
-          <option value="Jun_2024">June 2024</option>
-          <option value="May_2024">May 2024</option>
-          <option value="Apr_2024">April 2024</option>
-          <option value="Mar_2024">March 2024</option>
-          <option value="Feb_2024">February 2024</option>
-          <option value="Jan_2024">January 2024</option>
-          <option value="Dec_2023">December 2023</option>
-        </select>
-      </div>
-
-      <!-- LLM provider badge — updated via /api/status on load -->
       <div class="llm-badge" id="llmBadge" title="Active LLM provider">
         <span class="llm-badge-dot"></span>
         <span id="llmBadgeText">LLM</span>
       </div>
-
       <div class="status"><div class="status-dot"></div>LIVE</div>
     </div>
   </header>
 
-  <!-- ── BODY ────────────────────────────────────────────────── -->
-  <div class="body">
+  <!-- ── WORKSPACE ──────────────────────────────────────────── -->
+  <div class="workspace">
 
-    <!-- ── MAIN ─────────────────────────────────────────────────── -->
-    <main>
-
-      <!-- ── INPUT ──────────────────────────────────────────────── -->
-      <div class="input-wrap" id="inputWrap">
-        <textarea id="questionInput" rows="3"
-          placeholder="Ask anything about your streaming data…&#10;e.g. Which countries had the highest average RTT this month?"
-        ></textarea>
-        <div class="input-bar">
-          <div class="input-bar-left">
-            <button class="btn btn-voice" id="voiceBtn" title="Click to speak">
-              <span class="voice-dot" id="voiceDot">○</span>
-              <span id="voiceLabel">VOICE</span>
-            </button>
-            <span id="listeningHint" style="display:none; color:var(--accent); font-size:11px; animation:pulse 1s infinite;">Listening…</span>
-          </div>
-          <div class="input-bar-right">
-            <span class="hint">↵ ENTER · SHIFT+↵ for newline</span>
-            <button class="btn btn-stop" id="stopBtn" style="display:none;" title="Cancel the running query">■ STOP</button>
-            <button class="btn btn-run" id="runBtn">RUN QUERY →</button>
-          </div>
-        </div>
+    <!-- ── SIDEBAR ────────────────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <button class="new-chat-btn" id="newChatBtn">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          NEW CHAT
+        </button>
       </div>
-
-      <!-- ── LOADING ─────────────────────────────────────────────── -->
-      <div class="loading" id="loadingBar" style="display:none;">
-        <div class="loading-dots">
-          <div class="loading-dot" style="animation:pulse .8s 0s infinite;"></div>
-          <div class="loading-dot" style="animation:pulse .8s .2s infinite;"></div>
-          <div class="loading-dot" style="animation:pulse .8s .4s infinite;"></div>
-        </div>
-        <span id="loadingText">Generating pipeline and querying database…</span>
-      </div>
-
-      <!-- ── ERROR ───────────────────────────────────────────────── -->
-      <div class="error-box" id="errorBox" style="display:none;">
-        <span class="error-label">ERROR: </span><span id="errorMsg"></span>
-      </div>
-
-      <!-- ── RESULTS PANEL ──────────────────────────────────────── -->
-      <div class="results-panel" id="resultsPanel" style="display:none;">
-
-        <div class="results-header">
-          <div class="results-header-left">
-            <span class="results-label" id="resultsLabel">Results</span>
-            <span class="results-meta"  id="resultsMeta"></span>
-            <!-- ANALYZE button — triggers AI summary of the current results -->
-            <button class="btn-analyze" id="analyzeBtn" title="Ask AI to analyze these results">
-              ✦ ANALYZE
-            </button>
-          </div>
-          <div style="display:flex; gap:.5rem; align-items:center;">
-            <div class="view-tabs">
-              <button class="tab-btn active" data-view="table">TABLE</button>
-              <button class="tab-btn"        data-view="json">JSON</button>
-              <button class="tab-btn"        data-view="pipeline">PIPELINE</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- One-sentence LLM explanation of what the query does -->
-        <div class="explanation-bar" id="explanationBar" style="display:none;">
-          <span class="explanation-arrow">›</span>
-          <span id="explanationText"></span>
-        </div>
-
-        <!-- AI analysis result (shown after clicking ANALYZE) -->
-        <div class="analysis-bar" id="analysisBar" style="display:none;">
-          <span class="analysis-label">✦ AI ANALYSIS</span>
-          <div id="analysisText"></div>
-          <div class="analysis-meta" id="analysisMeta"></div>
-        </div>
-
-        <!-- Copy button for pipeline view -->
-        <div class="copy-bar" id="copyBar" style="display:none;">
-          <button class="btn" id="copyBtn">COPY PIPELINE</button>
-        </div>
-
-        <!-- Scrollable result body -->
-        <div class="results-body" id="resultsBody"></div>
-
-        <!-- Pagination (shown when results > PAGE_SIZE) -->
-        <div class="pagination-bar" id="paginationBar" style="display:none;">
-          <button class="page-btn" id="prevPageBtn">← PREV</button>
-          <span class="page-info" id="pageInfo">Page 1 of N</span>
-          <button class="page-btn" id="nextPageBtn">NEXT →</button>
-        </div>
-      </div>
-
-      <!-- ── EMPTY STATE ─────────────────────────────────────────── -->
-      <div class="empty-state" id="emptyState">
-        <div style="text-align:center;">
-          <div class="empty-glyph">E3DS</div>
-          <div class="empty-hint">
-            Type a question above and press Enter<br>
-            Voice input supported in Chrome and Edge
-          </div>
-        </div>
-      </div>
-
-    </main>
-
-    <!-- ── HISTORY PANEL (right) ─────────────────────────────────── -->
-    <aside class="history-panel">
-      <div class="history-panel-head">
-        <span class="history-panel-title">CHAT HISTORY</span>
-        <button class="btn-clear" id="clearHistoryBtn" title="Clear all history">CLEAR ALL</button>
-      </div>
-      <div class="history-list" id="historyList">
-        <div class="history-empty" id="historyEmpty">
-          No history yet.<br>Run a query to see it here.
+      <div class="sidebar-sessions" id="sidebarSessions">
+        <div class="sidebar-empty" id="sidebarEmpty">
+          No conversations yet.<br>Ask a question to start.
         </div>
       </div>
     </aside>
 
-  </div>
-</div>
+    <!-- ── CHAT AREA ────────────────────────────────────────────── -->
+    <div class="chat-area">
+
+      <!-- Messages scroll area -->
+      <div class="messages-wrap" id="messagesWrap">
+
+        <!-- Welcome state (shown when no messages) -->
+        <div class="welcome-state" id="welcomeState">
+          <div class="welcome-glyph">E3DS</div>
+          <div class="welcome-sub">
+            Ask anything about your streaming data.<br>
+            Month/year is detected automatically from your question.
+          </div>
+          <div class="example-chips">
+            <button class="example-chip">Top 5 countries by session in April 2026</button>
+            <button class="example-chip">Show VPN users from October 2025</button>
+            <button class="example-chip">Average RTT by browser this month</button>
+            <button class="example-chip">Which apps had the most sessions last month?</button>
+          </div>
+        </div>
+
+        <!-- Message turns render here -->
+        <div class="messages" id="messages" style="display:none;"></div>
+
+      </div>
+
+      <!-- Input dock -->
+      <div class="input-dock">
+        <div class="input-outer">
+          <div class="input-wrap" id="inputWrap">
+            <textarea id="questionInput" rows="1"
+              placeholder="Ask anything about your streaming data…"></textarea>
+            <div class="input-actions">
+              <button class="btn-icon btn-voice" id="voiceBtn" title="Voice input">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+              <button class="btn-icon btn-stop-inline" id="stopBtn" style="display:none;" title="Stop">
+                ■
+              </button>
+              <button class="btn-icon btn-send" id="runBtn" title="Send (Enter)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="input-footer">
+            <span class="listening-hint" id="listeningHint" style="display:none;">● Listening…</span>
+            <span></span>
+            <span class="input-footer-hint">Enter to send · Shift+Enter for newline</span>
+          </div>
+        </div>
+      </div>
+    </div><!-- end .chat-area -->
+
+  </div><!-- end .workspace -->
+</div><!-- end #app -->
 
 <script>
 // ============================================================
-// Eagle 3DS Query UI — v3
+// Eagle 3DS Query UI — v4  (ChatGPT-style conversation)
 // ============================================================
-// v3 changes:
-//   - Chat history stored in MongoDB, loaded from /api/history
-//   - History panel on the RIGHT with per-entry delete + clear all
-//   - Clicking a history entry re-runs the query
-//   - Example queries sidebar removed
+// Layout: sidebar (past chats) + scrolling message thread + fixed input
+// History: stored in localStorage — clicking a session loads it,
+//          does NOT re-run queries.
+// Per-message: each result card has its own tab/page state.
 // ============================================================
 
-// ── Pagination settings ───────────────────────────────────────
 const PAGE_SIZE = 25;
 
-// ── App state ─────────────────────────────────────────────────
-let currentResults = null;
-let currentView    = "table";
-let currentRows    = [];
-let currentPage    = 1;
-let isListening    = false;
-let recognition    = null;
-let isAnalyzing    = false;
-let activeAbort    = null;   // AbortController for the in-flight /api/query fetch
-let _timedOut      = false;  // true when the safetyTimer fired (vs user clicking STOP)
+// ── Session & conversation state ──────────────────────────────
+// A "session" = one continuous conversation (a series of turns).
+// A "turn"    = one user question + one assistant response.
+//
+// Conversation data lives in localStorage under key "e3ds_chats".
+// Each entry: { id, title, createdAt, turns: [{role, content|data|error, ts}] }
 
-// ── Session ID for conversation context ───────────────────────
-// Generated once per page load. Sent with every query so the
-// server can give the LLM context about previous questions in
-// this session. This enables follow-up questions:
-//   "What are the top countries?" → "Now filter to just Europe"
-// A new tab or page refresh starts a fresh session automatically.
-const SESSION_ID = crypto.randomUUID();
+const STORE_KEY  = "e3ds_chats";
+const MAX_CHATS  = 40;      // max sessions to keep in localStorage
+const MAX_ROWS   = 50;      // max result rows stored per turn (localStorage size)
+
+let SESSION_ID    = crypto.randomUUID();   // current conversation ID
+let currentTurns  = [];                    // turns for the active session
+let activeAbort   = null;
+let _timedOut     = false;
+let isListening   = false;
+let recognition   = null;
+
+// Per-message render state: WeakMap<element, {rows, page, view, data}>
+const msgState = new WeakMap();
+
 
 // ── DOM refs ──────────────────────────────────────────────────
-const questionInput   = document.getElementById("questionInput");
-const runBtn          = document.getElementById("runBtn");
-const stopBtn         = document.getElementById("stopBtn");
-const voiceBtn        = document.getElementById("voiceBtn");
-const voiceDot        = document.getElementById("voiceDot");
-const voiceLabel      = document.getElementById("voiceLabel");
-const listeningHint   = document.getElementById("listeningHint");
-const inputWrap       = document.getElementById("inputWrap");
-const loadingBar      = document.getElementById("loadingBar");
-const loadingText     = document.getElementById("loadingText");
-const errorBox        = document.getElementById("errorBox");
-const errorMsg        = document.getElementById("errorMsg");
-const resultsPanel    = document.getElementById("resultsPanel");
-const resultsLabel    = document.getElementById("resultsLabel");
-const resultsMeta     = document.getElementById("resultsMeta");
-const explanationBar  = document.getElementById("explanationBar");
-const explanationText = document.getElementById("explanationText");
-const analysisBar     = document.getElementById("analysisBar");
-const analysisText    = document.getElementById("analysisText");
-const analysisMeta    = document.getElementById("analysisMeta");
-const analyzeBtn      = document.getElementById("analyzeBtn");
-const copyBar         = document.getElementById("copyBar");
-const copyBtn         = document.getElementById("copyBtn");
-const resultsBody     = document.getElementById("resultsBody");
-const paginationBar   = document.getElementById("paginationBar");
-const prevPageBtn     = document.getElementById("prevPageBtn");
-const nextPageBtn     = document.getElementById("nextPageBtn");
-const pageInfo        = document.getElementById("pageInfo");
-const emptyState      = document.getElementById("emptyState");
-const historyList     = document.getElementById("historyList");
-const historyEmpty    = document.getElementById("historyEmpty");
-const clearHistoryBtn = document.getElementById("clearHistoryBtn");
-const collectionSelect = document.getElementById("collectionSelect");
-const llmBadge        = document.getElementById("llmBadge");
-const llmBadgeText    = document.getElementById("llmBadgeText");
+const questionInput  = document.getElementById("questionInput");
+const runBtn         = document.getElementById("runBtn");
+const stopBtn        = document.getElementById("stopBtn");
+const voiceBtn       = document.getElementById("voiceBtn");
+const listeningHint  = document.getElementById("listeningHint");
+const inputWrap      = document.getElementById("inputWrap");
+const messagesWrap   = document.getElementById("messagesWrap");
+const messagesEl     = document.getElementById("messages");
+const welcomeState   = document.getElementById("welcomeState");
+const sidebarSessions = document.getElementById("sidebarSessions");
+const sidebarEmpty   = document.getElementById("sidebarEmpty");
+const newChatBtn     = document.getElementById("newChatBtn");
+const llmBadge       = document.getElementById("llmBadge");
+const llmBadgeText   = document.getElementById("llmBadgeText");
+
+
+// ── localStorage helpers ──────────────────────────────────────
+function getChats() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); }
+  catch { return []; }
+}
+function saveChats(chats) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(chats.slice(0, MAX_CHATS))); }
+  catch { /* storage full */ }
+}
+function getChat(id) {
+  return getChats().find(c => c.id === id) || null;
+}
+function upsertChat(chat) {
+  const chats   = getChats().filter(c => c.id !== chat.id);
+  chats.unshift(chat);   // newest first
+  saveChats(chats);
+}
+function deleteChat(id) {
+  saveChats(getChats().filter(c => c.id !== id));
+}
 
 
 // ── LLM status badge ──────────────────────────────────────────
-// Fetches /api/status on load and every 30 seconds to update the
-// LOCAL / CLOUD indicator in the header.
 async function refreshLLMStatus() {
   try {
     const r    = await fetch("/api/status");
     const data = await r.json();
-
     if (data.provider === "ollama") {
       if (data.available) {
-        llmBadge.className = "llm-badge local";
+        llmBadge.className    = "llm-badge local";
         llmBadgeText.textContent = `LOCAL · ${data.model.split(":")[0]}`;
-        llmBadge.title = `Ollama: ${data.model} (running)`;
+        llmBadge.title        = `Ollama: ${data.model} (running)`;
       } else {
-        llmBadge.className = "llm-badge error";
+        llmBadge.className    = "llm-badge error";
         llmBadgeText.textContent = "LOCAL OFFLINE";
-        llmBadge.title = `Ollama (${data.model}) is not running. Fallback: ${data.fallback}`;
       }
     } else {
-      llmBadge.className = "llm-badge cloud";
-      llmBadgeText.textContent = `CLOUD · ${data.model.replace("gemini-", "").replace("-flash", "⚡")}`;
-      llmBadge.title = `Google Gemini: ${data.model}`;
+      llmBadge.className    = "llm-badge cloud";
+      llmBadgeText.textContent = `CLOUD · ${data.model.replace("gemini-","").replace("-flash","⚡")}`;
     }
   } catch {
-    llmBadge.className = "llm-badge error";
+    llmBadge.className    = "llm-badge error";
     llmBadgeText.textContent = "LLM ERROR";
   }
 }
-
 refreshLLMStatus();
 setInterval(refreshLLMStatus, 30_000);
 
 
-// ── Keyboard handling ─────────────────────────────────────────
+// ── Auto-resize textarea ──────────────────────────────────────
+questionInput.addEventListener("input", () => {
+  questionInput.style.height = "auto";
+  questionInput.style.height = Math.min(questionInput.scrollHeight, 180) + "px";
+});
+
+
+// ── Keyboard / button handlers ────────────────────────────────
 questionInput.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitQuery(); }
 });
 runBtn.addEventListener("click", submitQuery);
 stopBtn.addEventListener("click", () => { if (activeAbort) activeAbort.abort(); });
+newChatBtn.addEventListener("click", startNewChat);
 
 
-// ── Tab switching ─────────────────────────────────────────────
-document.querySelectorAll(".tab-btn").forEach(btn => {
+// ── Example chips ─────────────────────────────────────────────
+document.querySelectorAll(".example-chip").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentView = btn.dataset.view;
-    if (currentResults) renderResults(currentResults);
+    questionInput.value = btn.textContent;
+    questionInput.dispatchEvent(new Event("input"));
+    submitQuery();
   });
 });
 
 
-// ── Copy pipeline ─────────────────────────────────────────────
-copyBtn.addEventListener("click", () => {
-  const pipe = currentResults?.executedPipeline || [];
-  navigator.clipboard.writeText(JSON.stringify(pipe, null, 2))
-    .then(() => { copyBtn.textContent = "COPIED ✓"; setTimeout(() => { copyBtn.textContent = "COPY PIPELINE"; }, 2000); })
-    .catch(() => { copyBtn.textContent = "FAILED"; setTimeout(() => { copyBtn.textContent = "COPY PIPELINE"; }, 2000); });
-});
+// ── Start a new chat session ──────────────────────────────────
+function startNewChat() {
+  SESSION_ID   = crypto.randomUUID();
+  currentTurns = [];
+  messagesEl.innerHTML = "";
+  messagesEl.style.display  = "none";
+  welcomeState.style.display = "flex";
+  // Deselect sidebar item
+  document.querySelectorAll(".session-item").forEach(el => el.classList.remove("active"));
+  questionInput.value = "";
+  questionInput.style.height = "auto";
+  questionInput.focus();
+}
 
 
-// ── Pagination ─────────────────────────────────────────────────
-prevPageBtn.addEventListener("click", () => {
-  if (currentPage > 1) { currentPage--; renderTablePage(); }
-});
-nextPageBtn.addEventListener("click", () => {
-  const totalPages = Math.ceil(currentRows.length / PAGE_SIZE);
-  if (currentPage < totalPages) { currentPage++; renderTablePage(); }
-});
+// ── Submit a query ────────────────────────────────────────────
+async function submitQuery() {
+  const q = questionInput.value.trim();
+  if (!q || runBtn.disabled) return;
 
-
-// ── ANALYZE button ─────────────────────────────────────────────
-// Takes the current results and sends them to /api/analyze.
-// Uses chunked map-reduce so it works even for 200-doc result sets
-// that wouldn't fit in the LLM's context window.
-analyzeBtn.addEventListener("click", async () => {
-  if (!currentResults || isAnalyzing) return;
-
-  const rows = currentResults.queryType === "dual"
-    ? (currentResults.results?.merged || currentResults.results?.primary || [])
-    : (currentResults.results || []);
-
-  if (rows.length === 0) {
-    analysisText.textContent = "No results to analyze.";
-    analysisBar.style.display = "block";
-    return;
+  // Show messages area if first message in this session
+  if (currentTurns.length === 0) {
+    welcomeState.style.display = "none";
+    messagesEl.style.display   = "flex";
   }
 
-  const question = currentResults.meta?.question || questionInput.value.trim();
+  // Append user bubble
+  appendUserMessage(q);
 
-  isAnalyzing = true;
-  analyzeBtn.textContent  = "ANALYZING…";
-  analyzeBtn.classList.add("analyzing");
-  analyzeBtn.disabled     = true;
+  // Append assistant loading placeholder
+  const loadingEl = appendLoadingMessage();
 
-  // Show analysis bar with loading message
-  analysisText.textContent = `Analyzing ${rows.length} records${rows.length > 25 ? " (using chunked processing)…" : "…"}`;
-  analysisMeta.textContent = "";
-  analysisBar.style.display = "block";
-
-  try {
-    const res  = await fetch("/api/analyze", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ results: rows, question }),
-    });
-    const data = await res.json();
-
-    if (!data.success) throw new Error(data.error);
-
-    const d = data.data;
-    analysisText.textContent = d.summary;
-    analysisMeta.textContent =
-      `${d.method === "chunked" ? `Chunked (${d.chunksUsed} chunks)` : "Direct"} · ` +
-      `${d.docsAnalyzed} docs · ${d.elapsedSeconds}s`;
-
-  } catch (err) {
-    analysisText.textContent = `Analysis failed: ${err.message}`;
-    analysisMeta.textContent = "";
-  } finally {
-    isAnalyzing = false;
-    analyzeBtn.textContent = "✦ ANALYZE";
-    analyzeBtn.classList.remove("analyzing");
-    analyzeBtn.disabled = false;
-  }
-});
-
-
-// ── Submit query ───────────────────────────────────────────────
-async function submitQuery(overrideQuestion) {
-  const q = (overrideQuestion || questionInput.value).trim();
-  if (!q) return;
+  // Clear input
+  questionInput.value = "";
+  questionInput.style.height = "auto";
 
   setLoading(true);
-  showPanel("loading");
-  loadingText.textContent = "Generating MongoDB pipeline…";
-  // After a short delay, update the loading message to reflect
-  // that we're now waiting on MongoDB (visible feedback during slow queries)
-  setTimeout(() => {
-    if (loadingText.textContent.includes("pipeline"))
-      loadingText.textContent = "Running query against MongoDB…";
-  }, 3000);
-  setTimeout(() => {
-    if (loadingBar.style.display !== "none")
-      loadingText.textContent = "Still working… (first query loads the model into GPU — up to 60s)";
-  }, 20_000);
-  setTimeout(() => {
-    if (loadingBar.style.display !== "none")
-      loadingText.textContent = "Almost there… LLM is generating the pipeline";
-  }, 60_000);
 
-  // AbortController lets the STOP button cancel the in-flight request.
   _timedOut   = false;
   activeAbort = new AbortController();
 
-  // Safety net: 270s matches Python-side Ollama timeout (300s) minus buffer.
-  // On first server start the model loads from disk into VRAM (~30-60s on GPU)
-  // before generation begins. Subsequent queries are much faster (~5-15s).
-  const safetyTimer = setTimeout(() => {
-    _timedOut = true;
-    if (activeAbort) activeAbort.abort();
-  }, 270_000);
-
-  // Hide any previous analysis
-  analysisBar.style.display = "none";
+  // Progressive loading text
+  let loadingTimer1 = setTimeout(() => updateLoadingText(loadingEl, "Still working… model may be loading into GPU"), 20_000);
+  let loadingTimer2 = setTimeout(() => updateLoadingText(loadingEl, "Almost there… generating the pipeline"), 60_000);
+  const safetyTimer = setTimeout(() => { _timedOut = true; if (activeAbort) activeAbort.abort(); }, 270_000);
 
   try {
     const res  = await fetch("/api/query", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ question: q, collection: collectionSelect.value, session_id: SESSION_ID }),
+      body:    JSON.stringify({ question: q, collection: "Apr_2026", session_id: SESSION_ID }),
       signal:  activeAbort.signal,
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || "Query failed");
 
-    currentResults = data.data;
-    currentPage    = 1;
-    currentView    = "table";
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelector('.tab-btn[data-view="table"]').classList.add("active");
+    // Replace loading with result card
+    replaceLoadingWithResult(loadingEl, data.data);
 
-    // Update the history panel immediately with local data.
-    // The server persists to MongoDB asynchronously — we don't wait for it.
-    prependHistoryEntry({
-      id:              "",   // MongoDB assigns the real _id; unknown here
-      question:        q,
-      collection:      collectionSelect.value,
-      result_count:    data.data.queryType === "dual"
-                         ? (data.data.summary?.primary?.count ?? 0)
-                         : (data.data.summary?.count ?? 0),
-      result_label:    data.data.resultLabel    || "",
-      explanation:     data.data.explanation    || "",
-      elapsed_seconds: data.data.meta?.elapsedSeconds ?? 0,
-      timestamp:       new Date().toISOString(),
-    });
-    showPanel("results");
-    renderResults(data.data);
+    // Persist turn
+    const turn = {
+      role:      "turn",
+      question:  q,
+      data:      trimDataForStorage(data.data),
+      ts:        new Date().toISOString(),
+    };
+    currentTurns.push(turn);
+    persistCurrentSession(q);
 
   } catch (err) {
+    let msg;
     if (err.name === "AbortError") {
-      if (_timedOut) {
-        showPanel("error", "Query timed out after 4.5 min. Check that Ollama is running and using your GPU (run: ollama ps). If VRAM shows 0, CUDA drivers may not be set up — see the setup guide.");
-      } else {
-        showPanel("empty");   // user clicked STOP — go back to idle, no error
-      }
+      msg = _timedOut
+        ? "Query timed out after 4.5 min. Check that Ollama is running and using your GPU (run: ollama ps)."
+        : null;  // user clicked STOP — remove loading bubble silently
     } else {
-      showPanel("error", err.message);
+      msg = err.message;
     }
+
+    if (msg) {
+      replaceLoadingWithError(loadingEl, msg);
+      const turn = { role: "turn", question: q, error: msg, ts: new Date().toISOString() };
+      currentTurns.push(turn);
+      persistCurrentSession(q);
+    } else {
+      loadingEl.remove();  // STOP clicked — quietly remove
+    }
+
   } finally {
+    clearTimeout(loadingTimer1);
+    clearTimeout(loadingTimer2);
     clearTimeout(safetyTimer);
     activeAbort = null;
     setLoading(false);
+    scrollToBottom();
   }
 }
 
 
-// ── Panel state management ─────────────────────────────────────
-function showPanel(which, msg = "") {
-  loadingBar.style.display   = "none";
-  errorBox.style.display     = "none";
-  resultsPanel.style.display = "none";
-  emptyState.style.display   = "none";
-
-  if (which === "loading")  loadingBar.style.display   = "flex";
-  if (which === "error")  { errorBox.style.display     = "block"; errorMsg.textContent = msg; }
-  if (which === "results")  resultsPanel.style.display = "flex";
-  if (which === "empty")    emptyState.style.display   = "flex";
-}
-
-function setLoading(on) {
-  runBtn.disabled = voiceBtn.disabled = questionInput.disabled = on;
-  runBtn.textContent = on ? "QUERYING…" : "RUN QUERY →";
-  runBtn.style.display  = on ? "none"  : "";
-  stopBtn.style.display = on ? ""      : "none";
+// ── Persist current session to localStorage ───────────────────
+function persistCurrentSession(firstQuestion) {
+  const chat = getChat(SESSION_ID) || {
+    id:        SESSION_ID,
+    title:     firstQuestion.slice(0, 60),
+    createdAt: new Date().toISOString(),
+    turns:     [],
+  };
+  chat.turns = currentTurns;
+  upsertChat(chat);
+  renderSidebar();
 }
 
 
-// ── Render results ─────────────────────────────────────────────
-function renderResults(data) {
-  // Header
-  const count   = data.queryType === "dual" ? (data.summary?.primary?.count ?? 0) : (data.summary?.count ?? 0);
-  const elapsed = data.meta?.elapsedSeconds;
-  resultsLabel.textContent = data.resultLabel || "Query Results";
-  resultsMeta.textContent  = `${count} record${count !== 1 ? "s" : ""}${elapsed != null ? " · " + elapsed + "s" : ""}`;
+// ── Trim result data for localStorage ────────────────────────
+function trimDataForStorage(data) {
+  if (!data) return data;
+  const trimmed = { ...data };
+  if (Array.isArray(trimmed.results)) {
+    trimmed.results = trimmed.results.slice(0, MAX_ROWS);
+  } else if (trimmed.results && typeof trimmed.results === "object") {
+    const r = trimmed.results;
+    if (Array.isArray(r.primary)) trimmed.results = { ...r, primary: r.primary.slice(0, MAX_ROWS) };
+    if (Array.isArray(r.merged))  trimmed.results = { ...r, merged:  r.merged.slice(0, MAX_ROWS) };
+  }
+  return trimmed;
+}
 
-  // Explanation
-  if (data.explanation) { explanationText.textContent = data.explanation; explanationBar.style.display = "block"; }
-  else                    explanationBar.style.display = "none";
 
-  // Copy bar (pipeline view only)
-  copyBar.style.display = currentView === "pipeline" ? "flex" : "none";
+// ── Message builders ──────────────────────────────────────────
+function appendUserMessage(question) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg msg-user";
+  wrap.innerHTML = `
+    <div class="msg-user-bubble">${escHtml(question)}</div>
+    <div class="msg-user-avatar">YOU</div>
+  `;
+  messagesEl.appendChild(wrap);
+  scrollToBottom();
+}
 
-  // Build the flat rows array for table / JSON views
-  const rawRows = data.queryType === "dual"
+function appendLoadingMessage() {
+  const wrap = document.createElement("div");
+  wrap.className = "msg msg-assistant";
+  wrap.innerHTML = `
+    <div class="msg-assistant-avatar">AI</div>
+    <div class="msg-assistant-body">
+      <div class="msg-loading-dots">
+        <div class="msg-loading-dot" style="animation:pulse .8s 0s infinite"></div>
+        <div class="msg-loading-dot" style="animation:pulse .8s .2s infinite"></div>
+        <div class="msg-loading-dot" style="animation:pulse .8s .4s infinite"></div>
+        <span class="msg-loading-text" id="_loadingText">Generating MongoDB pipeline…</span>
+      </div>
+    </div>
+  `;
+  messagesEl.appendChild(wrap);
+  scrollToBottom();
+  return wrap;
+}
+
+function updateLoadingText(loadingEl, text) {
+  const t = loadingEl.querySelector("#_loadingText");
+  if (t) t.textContent = text;
+}
+
+function replaceLoadingWithResult(loadingEl, data) {
+  const body = loadingEl.querySelector(".msg-assistant-body");
+  body.innerHTML = "";
+  body.appendChild(buildResultCard(data));
+}
+
+function replaceLoadingWithError(loadingEl, msg) {
+  const body = loadingEl.querySelector(".msg-assistant-body");
+  body.innerHTML = `
+    <div class="msg-error-card">
+      <span class="msg-error-label">ERROR: </span>${escHtml(msg)}
+    </div>
+  `;
+}
+
+
+// ── Build a result card (inline in a message) ─────────────────
+function buildResultCard(data) {
+  const card = document.createElement("div");
+  card.className = "result-card";
+
+  const rows = data.queryType === "dual"
     ? (data.results?.merged || data.results?.primary || [])
     : (data.results || []);
-  currentRows = rawRows;
+  const count   = data.queryType === "dual" ? (data.summary?.primary?.count ?? 0) : (data.summary?.count ?? 0);
+  const elapsed = data.meta?.elapsedSeconds;
 
-  resultsBody.innerHTML = "";
+  // Per-card state
+  const state = { rows, page: 1, view: "table", data, isAnalyzing: false };
+  msgState.set(card, state);
 
-  if (currentView === "table") {
-    currentPage = 1;
-    renderTablePage();
-  } else if (currentView === "json") {
-    paginationBar.style.display = "none";
+  // Header
+  const header = document.createElement("div");
+  header.className = "result-card-header";
+  header.innerHTML = `
+    <div class="result-card-header-left">
+      <span class="result-label">${escHtml(data.resultLabel || "Query Results")}</span>
+      <span class="result-meta">${count} record${count !== 1 ? "s" : ""}${elapsed != null ? " · " + elapsed + "s" : ""}</span>
+      <button class="btn-analyze" title="AI analysis">✦ ANALYZE</button>
+    </div>
+    <div class="result-card-header-right">
+      <div class="view-tabs">
+        <button class="tab-btn active" data-view="table">TABLE</button>
+        <button class="tab-btn"        data-view="json">JSON</button>
+        <button class="tab-btn"        data-view="pipeline">PIPELINE</button>
+      </div>
+    </div>
+  `;
+  card.appendChild(header);
+
+  // Explanation bar
+  if (data.explanation) {
+    const expl = document.createElement("div");
+    expl.className = "explanation-bar";
+    expl.innerHTML = `<span class="explanation-arrow">›</span>${escHtml(data.explanation)}`;
+    card.appendChild(expl);
+  }
+
+  // Analysis bar (hidden initially)
+  const analysisBar = document.createElement("div");
+  analysisBar.className = "analysis-bar";
+  analysisBar.style.display = "none";
+  analysisBar.innerHTML = `<span class="analysis-label">✦ AI ANALYSIS</span><div class="analysis-text"></div><div class="analysis-meta"></div>`;
+  card.appendChild(analysisBar);
+
+  // Copy bar (pipeline only)
+  const copyBar = document.createElement("div");
+  copyBar.className = "copy-bar";
+  copyBar.style.display = "none";
+  copyBar.innerHTML = `<button class="btn-copy">COPY PIPELINE</button>`;
+  card.appendChild(copyBar);
+
+  // Result body
+  const resultBody = document.createElement("div");
+  resultBody.className = "result-body";
+  card.appendChild(resultBody);
+
+  // Pagination bar
+  const pageBar = document.createElement("div");
+  pageBar.className = "pagination-bar";
+  pageBar.style.display = "none";
+  pageBar.innerHTML = `
+    <button class="page-btn prev-btn">← PREV</button>
+    <span class="page-info"></span>
+    <button class="page-btn next-btn">NEXT →</button>
+  `;
+  card.appendChild(pageBar);
+
+  // ── Wire up events ──────────────────────────────────────────
+
+  // Tab switching
+  header.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      header.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.view = btn.dataset.view;
+      renderCardBody(card);
+    });
+  });
+
+  // Pagination
+  pageBar.querySelector(".prev-btn").addEventListener("click", () => {
+    if (state.page > 1) { state.page--; renderCardBody(card); }
+  });
+  pageBar.querySelector(".next-btn").addEventListener("click", () => {
+    const total = Math.ceil(state.rows.length / PAGE_SIZE);
+    if (state.page < total) { state.page++; renderCardBody(card); }
+  });
+
+  // Copy pipeline
+  copyBar.querySelector(".btn-copy").addEventListener("click", () => {
+    const btn  = copyBar.querySelector(".btn-copy");
+    const pipe = data.executedPipeline || [];
+    navigator.clipboard.writeText(JSON.stringify(pipe, null, 2))
+      .then(() => { btn.textContent = "COPIED ✓"; setTimeout(() => btn.textContent = "COPY PIPELINE", 2000); })
+      .catch(() => { btn.textContent = "FAILED";  setTimeout(() => btn.textContent = "COPY PIPELINE", 2000); });
+  });
+
+  // Analyze
+  header.querySelector(".btn-analyze").addEventListener("click", async () => {
+    if (state.isAnalyzing) return;
+    const aBtn = header.querySelector(".btn-analyze");
+    if (rows.length === 0) {
+      analysisBar.querySelector(".analysis-text").textContent = "No results to analyze.";
+      analysisBar.style.display = "block";
+      return;
+    }
+    state.isAnalyzing = true;
+    aBtn.textContent = "ANALYZING…";
+    aBtn.classList.add("analyzing");
+    aBtn.disabled = true;
+    analysisBar.querySelector(".analysis-text").textContent =
+      `Analyzing ${rows.length} records${rows.length > 25 ? " (chunked)…" : "…"}`;
+    analysisBar.querySelector(".analysis-meta").textContent = "";
+    analysisBar.style.display = "block";
+    try {
+      const res  = await fetch("/api/analyze", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ results: rows, question: data.meta?.question || "" }),
+      });
+      const resp = await res.json();
+      if (!resp.success) throw new Error(resp.error);
+      const d = resp.data;
+      analysisBar.querySelector(".analysis-text").textContent = d.summary;
+      analysisBar.querySelector(".analysis-meta").textContent =
+        `${d.method === "chunked" ? `Chunked (${d.chunksUsed} chunks)` : "Direct"} · ${d.docsAnalyzed} docs · ${d.elapsedSeconds}s`;
+    } catch (err) {
+      analysisBar.querySelector(".analysis-text").textContent = `Analysis failed: ${err.message}`;
+    } finally {
+      state.isAnalyzing = false;
+      aBtn.textContent = "✦ ANALYZE";
+      aBtn.classList.remove("analyzing");
+      aBtn.disabled = false;
+    }
+  });
+
+  renderCardBody(card);
+  return card;
+}
+
+
+// ── Render the body of a result card ─────────────────────────
+function renderCardBody(card) {
+  const state    = msgState.get(card);
+  const copyBar  = card.querySelector(".copy-bar");
+  const pageBar  = card.querySelector(".pagination-bar");
+  const body     = card.querySelector(".result-body");
+  const data     = state.data;
+
+  copyBar.style.display = state.view === "pipeline" ? "flex" : "none";
+  body.innerHTML = "";
+
+  if (state.view === "table") {
+    renderTableInBody(body, pageBar, state);
+  } else if (state.view === "json") {
+    pageBar.style.display = "none";
     const pre = document.createElement("pre");
     pre.className = "code-view";
-    pre.textContent = JSON.stringify(currentRows, null, 2);
-    resultsBody.appendChild(pre);
-  } else if (currentView === "pipeline") {
-    copyBar.style.display = "flex";
-    paginationBar.style.display = "none";
+    pre.textContent = JSON.stringify(state.rows, null, 2);
+    body.appendChild(pre);
+  } else if (state.view === "pipeline") {
+    pageBar.style.display = "none";
     const pipe = data.executedPipeline || [];
     const pre  = document.createElement("pre");
     pre.className = "code-view pipeline-view";
     pre.textContent = JSON.stringify(pipe, null, 2);
-    resultsBody.appendChild(pre);
+    body.appendChild(pre);
   }
 }
 
 
-// ── Render one page of the table ───────────────────────────────
-function renderTablePage() {
-  resultsBody.innerHTML = "";
-
-  if (!currentRows || currentRows.length === 0) {
+function renderTableInBody(body, pageBar, state) {
+  if (!state.rows || state.rows.length === 0) {
     const d = document.createElement("div");
     d.style.cssText = "padding:2rem; color:var(--dimmer); text-align:center; font-size:12px;";
     d.textContent = "NO RECORDS RETURNED";
-    resultsBody.appendChild(d);
-    paginationBar.style.display = "none";
+    body.appendChild(d);
+    pageBar.style.display = "none";
     return;
   }
-
-  const totalPages = Math.ceil(currentRows.length / PAGE_SIZE);
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const end   = Math.min(start + PAGE_SIZE, currentRows.length);
-  const pageRows = currentRows.slice(start, end);
-
-  // Show/hide pagination bar
-  if (totalPages > 1) {
-    paginationBar.style.display = "flex";
-    pageInfo.textContent = `Page ${currentPage} of ${totalPages}  (${start + 1}–${end} of ${currentRows.length})`;
-    prevPageBtn.disabled = currentPage === 1;
-    nextPageBtn.disabled = currentPage === totalPages;
+  const total = Math.ceil(state.rows.length / PAGE_SIZE);
+  const start = (state.page - 1) * PAGE_SIZE;
+  const end   = Math.min(start + PAGE_SIZE, state.rows.length);
+  if (total > 1) {
+    pageBar.style.display = "flex";
+    pageBar.querySelector(".page-info").textContent =
+      `Page ${state.page} of ${total}  (${start+1}–${end} of ${state.rows.length})`;
+    pageBar.querySelector(".prev-btn").disabled = state.page === 1;
+    pageBar.querySelector(".next-btn").disabled = state.page === total;
   } else {
-    paginationBar.style.display = "none";
+    pageBar.style.display = "none";
   }
-
-  resultsBody.appendChild(buildTable(pageRows));
+  body.appendChild(buildTable(state.rows.slice(start, end)));
 }
 
 
-// ── Build table ────────────────────────────────────────────────
-function buildTable(docs) {
-  const flat = docs.map(flattenDoc);
+// ── Sidebar rendering ─────────────────────────────────────────
+function renderSidebar() {
+  const chats = getChats();
+  sidebarSessions.innerHTML = "";
 
-  const PRIORITY = [
-    "_id", "appInfo.owner", "appInfo.appName", "clientInfo.city",
-    "clientInfo.country_name", "loadTime", "webRtcStatsData.avgBitrate",
-    "webRtcStatsData.packetsLost", "webRtcStatsData.avgRoundTripTime",
-    "userDeviceInfo.os.name", "userDeviceInfo.device.type", "startTime",
-    "count", "total", "average", "avg",
-  ];
+  if (chats.length === 0) {
+    sidebarSessions.appendChild(buildSidebarEmpty());
+    return;
+  }
+
+  // Group by date label
+  const groups = {};
+  chats.forEach(chat => {
+    const label = dateGroupLabel(chat.createdAt);
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(chat);
+  });
+
+  Object.entries(groups).forEach(([label, items]) => {
+    const g = document.createElement("div");
+    g.className = "sidebar-date-group";
+    const lbl = document.createElement("span");
+    lbl.className = "sidebar-date-label";
+    lbl.textContent = label;
+    g.appendChild(lbl);
+    items.forEach(chat => g.appendChild(buildSessionItem(chat)));
+    sidebarSessions.appendChild(g);
+  });
+}
+
+function buildSidebarEmpty() {
+  const d = document.createElement("div");
+  d.className = "sidebar-empty";
+  d.textContent = "No conversations yet.\nAsk a question to start.";
+  return d;
+}
+
+function buildSessionItem(chat) {
+  const item = document.createElement("button");
+  item.className = "session-item" + (chat.id === SESSION_ID ? " active" : "");
+  item.dataset.id = chat.id;
+
+  const turnCount = (chat.turns || []).length;
+  const ts        = fmtTime(chat.createdAt);
+
+  item.innerHTML = `
+    <span class="session-title">${escHtml(chat.title || "Untitled")}</span>
+    <span class="session-meta">${ts} · ${turnCount} turn${turnCount !== 1 ? "s" : ""}</span>
+    <button class="session-del" title="Delete this conversation">×</button>
+  `;
+
+  // Click → load conversation (no re-run)
+  item.addEventListener("click", e => {
+    if (e.target.classList.contains("session-del")) return;
+    loadSession(chat.id);
+  });
+
+  // Delete
+  item.querySelector(".session-del").addEventListener("click", e => {
+    e.stopPropagation();
+    deleteChat(chat.id);
+    // If deleting the active session, start fresh
+    if (chat.id === SESSION_ID) startNewChat();
+    renderSidebar();
+  });
+
+  return item;
+}
+
+function dateGroupLabel(iso) {
+  if (!iso) return "Earlier";
+  const d     = new Date(iso);
+  const now   = new Date();
+  const diffMs = now - d;
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  if (diffDays < 1)  return "Today";
+  if (diffDays < 2)  return "Yesterday";
+  if (diffDays < 7)  return "This week";
+  if (diffDays < 30) return "This month";
+  return d.toLocaleDateString([], { month: "long", year: "numeric" });
+}
+
+
+// ── Load a stored session into the chat area ──────────────────
+function loadSession(chatId) {
+  const chat = getChat(chatId);
+  if (!chat) return;
+
+  SESSION_ID   = chat.id;
+  currentTurns = chat.turns || [];
+
+  messagesEl.innerHTML  = "";
+  welcomeState.style.display = "none";
+  messagesEl.style.display   = "flex";
+
+  // Render all stored turns
+  currentTurns.forEach(turn => {
+    appendUserMessage(turn.question);
+    if (turn.error) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg msg-assistant";
+      wrap.innerHTML = `
+        <div class="msg-assistant-avatar">AI</div>
+        <div class="msg-assistant-body">
+          <div class="msg-error-card"><span class="msg-error-label">ERROR: </span>${escHtml(turn.error)}</div>
+        </div>
+      `;
+      messagesEl.appendChild(wrap);
+    } else if (turn.data) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg msg-assistant";
+      const body = document.createElement("div");
+      body.className = "msg-assistant-body";
+      body.appendChild(buildResultCard(turn.data));
+      wrap.innerHTML = "";
+      const avatar = document.createElement("div");
+      avatar.className = "msg-assistant-avatar";
+      avatar.textContent = "AI";
+      wrap.appendChild(avatar);
+      wrap.appendChild(body);
+      messagesEl.appendChild(wrap);
+    }
+  });
+
+  // Mark as active in sidebar
+  document.querySelectorAll(".session-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.id === chatId);
+  });
+
+  scrollToBottom();
+  questionInput.focus();
+}
+
+
+// ── Scroll chat to bottom ─────────────────────────────────────
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    messagesWrap.scrollTop = messagesWrap.scrollHeight;
+  });
+}
+
+
+// ── Loading state ─────────────────────────────────────────────
+function setLoading(on) {
+  runBtn.disabled  = on;
+  voiceBtn.disabled = on;
+  questionInput.disabled = on;
+  runBtn.style.display  = on ? "none" : "";
+  stopBtn.style.display = on ? ""     : "none";
+}
+
+
+// ── Table builder ─────────────────────────────────────────────
+const PRIORITY = [
+  "_id","appInfo.owner","appInfo.appName","clientInfo.city",
+  "clientInfo.country_name","loadTime","webRtcStatsData.avgBitrate",
+  "webRtcStatsData.packetsLost","webRtcStatsData.avgRoundTripTime",
+  "userDeviceInfo.os.name","userDeviceInfo.device.type",
+  "count","total","average","avg",
+];
+
+function buildTable(docs) {
+  const flat    = docs.map(flattenDoc);
   const allKeys = [...new Set(flat.flatMap(d => Object.keys(d)))];
   const cols = [
     ...PRIORITY.filter(k => allKeys.includes(k)),
@@ -877,22 +1111,17 @@ function buildTable(docs) {
 
   const table = document.createElement("table");
   table.className = "results-table";
-
   const thead = table.createTHead();
   const hrow  = thead.insertRow();
   cols.forEach(k => { const th = document.createElement("th"); th.textContent = k; hrow.appendChild(th); });
-
   const tbody = table.createTBody();
   flat.forEach(doc => {
     const tr = tbody.insertRow();
     cols.forEach(k => { const td = tr.insertCell(); td.appendChild(renderCell(doc[k])); });
   });
-
   return table;
 }
 
-
-// ── Flatten nested doc to dot-notation keys ────────────────────
 function flattenDoc(obj, prefix = "", depth = 0) {
   if (depth > 3) return { [prefix]: "[…]" };
   const out = {};
@@ -905,8 +1134,6 @@ function flattenDoc(obj, prefix = "", depth = 0) {
   return out;
 }
 
-
-// ── Render cell ────────────────────────────────────────────────
 function renderCell(v) {
   const s = document.createElement("span");
   if (v === null || v === undefined) { s.className = "val-null"; s.textContent = "—"; }
@@ -917,110 +1144,24 @@ function renderCell(v) {
 }
 
 
-// ── Chat history (MongoDB-backed) ─────────────────────────────
-
+// ── Utilities ─────────────────────────────────────────────────
 function escHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Format an ISO timestamp into a readable local string
 function fmtTime(iso) {
   if (!iso) return "";
-  const d = new Date(iso);
+  const d     = new Date(iso);
   const today = new Date();
-  const isToday = d.toDateString() === today.toDateString();
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (isToday) return time;
-  const date = d.toLocaleDateString([], { month: "short", day: "numeric" });
-  return `${date} · ${time}`;
+  const time  = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (d.toDateString() === today.toDateString()) return time;
+  return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " · " + time;
 }
 
-// Fetch history from the server and render it
-async function loadHistory() {
-  try {
-    const r    = await fetch("/api/history?limit=100");
-    const data = await r.json();
-    if (data.success) renderHistory(data.history);
-  } catch {
-    // Non-fatal — history panel just stays empty
-  }
-}
 
-// Prepend one entry to the panel without re-fetching (optimistic update)
-function prependHistoryEntry(entry) {
-  historyEmpty.style.display = "none";
-  const item = buildHistoryItem(entry);
-  historyList.insertBefore(item, historyList.firstChild);
-}
-
-function renderHistory(entries) {
-  // Remove all existing items (keep the empty placeholder)
-  [...historyList.querySelectorAll(".history-item")].forEach(el => el.remove());
-
-  if (!entries || entries.length === 0) {
-    historyEmpty.style.display = "block";
-    return;
-  }
-  historyEmpty.style.display = "none";
-  entries.forEach(entry => historyList.appendChild(buildHistoryItem(entry)));
-}
-
-function buildHistoryItem(entry) {
-  const item    = document.createElement("div");
-  item.className = "history-item";
-  item.dataset.id = entry.id || "";
-
-  const label = entry.result_label
-    ? `<span class="history-item-meta">${escHtml(entry.result_label)} · ${entry.result_count} results · ${entry.collection}</span>`
-    : `<span class="history-item-meta">${entry.result_count} results · ${entry.collection}</span>`;
-
-  item.innerHTML = `
-    <span class="history-item-time">${fmtTime(entry.timestamp)}</span>
-    <span class="history-item-q">${escHtml(entry.question)}</span>
-    ${label}
-    <button class="history-del" title="Remove this entry">×</button>
-  `;
-
-  // Click the card body → re-run the query
-  item.addEventListener("click", e => {
-    if (e.target.classList.contains("history-del")) return;
-    // Set the collection selector to match what was originally queried
-    if (entry.collection) {
-      const opt = [...collectionSelect.options].find(o => o.value === entry.collection);
-      if (opt) collectionSelect.value = entry.collection;
-    }
-    questionInput.value = entry.question;
-    submitQuery(entry.question);
-  });
-
-  // Delete button → remove from MongoDB and from the panel
-  item.querySelector(".history-del").addEventListener("click", async e => {
-    e.stopPropagation();
-    if (!entry.id) { item.remove(); return; }
-    try {
-      await fetch(`/api/history/${entry.id}`, { method: "DELETE" });
-    } catch { /* best-effort */ }
-    item.remove();
-    if (!historyList.querySelector(".history-item")) {
-      historyEmpty.style.display = "block";
-    }
-  });
-
-  return item;
-}
-
-// Clear all history button
-clearHistoryBtn.addEventListener("click", async () => {
-  if (!confirm("Clear all chat history?")) return;
-  try {
-    await fetch("/api/history", { method: "DELETE" });
-  } catch { /* best-effort */ }
-  [...historyList.querySelectorAll(".history-item")].forEach(el => el.remove());
-  historyEmpty.style.display = "block";
-});
-
-
-// ── Voice input ────────────────────────────────────────────────
+// ── Voice input ───────────────────────────────────────────────
 voiceBtn.addEventListener("click", () => { isListening ? stopVoice() : startVoice(); });
 
 function startVoice() {
@@ -1030,32 +1171,33 @@ function startVoice() {
   recognition.continuous = false; recognition.interimResults = true; recognition.lang = "en-US";
   let lastTranscript = "";
   recognition.onstart = () => {
-    isListening = true; voiceBtn.classList.add("active");
-    voiceDot.textContent = "●"; voiceDot.classList.add("pulse");
-    voiceLabel.textContent = "STOP"; listeningHint.style.display = "inline";
+    isListening = true;
+    voiceBtn.classList.add("active");
+    listeningHint.style.display = "inline";
     inputWrap.classList.add("listening");
   };
   recognition.onresult = e => {
     lastTranscript = Array.from(e.results).map(r => r[0].transcript).join("");
     questionInput.value = lastTranscript;
+    questionInput.dispatchEvent(new Event("input"));
   };
-  recognition.onend   = () => { stopVoiceUI(); if (lastTranscript.trim()) submitQuery(lastTranscript.trim()); };
-  recognition.onerror = e => { stopVoiceUI(); if (e.error !== "aborted" && e.error !== "no-speech") showPanel("error", `Voice: ${e.error}`); };
+  recognition.onend   = () => { stopVoiceUI(); if (lastTranscript.trim()) submitQuery(); };
+  recognition.onerror = e => { stopVoiceUI(); };
   recognition.start();
 }
 
 function stopVoice()   { recognition?.stop(); stopVoiceUI(); }
 function stopVoiceUI() {
-  isListening = false; voiceBtn.classList.remove("active");
-  voiceDot.textContent = "○"; voiceDot.classList.remove("pulse");
-  voiceLabel.textContent = "VOICE"; listeningHint.style.display = "none";
+  isListening = false;
+  voiceBtn.classList.remove("active");
+  listeningHint.style.display = "none";
   inputWrap.classList.remove("listening");
 }
 
 
-// ── Init ───────────────────────────────────────────────────────
-showPanel("empty");
-loadHistory();   // Fetch persisted history from MongoDB on page load
+// ── Init ──────────────────────────────────────────────────────
+renderSidebar();
+questionInput.focus();
 </script>
 </body>
 </html>
