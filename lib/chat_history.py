@@ -28,6 +28,7 @@
 #   This keeps the collection from growing unboundedly.
 # ============================================================
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -82,7 +83,7 @@ async def save_query(
         "timestamp":       datetime.now(timezone.utc),
     }
 
-    result = await db[HISTORY_COLLECTION].insert_one(doc)
+    result = await asyncio.shield(db[HISTORY_COLLECTION].insert_one(doc))
 
     # Trim old entries if we've exceeded the cap.
     # We do a count-then-delete rather than a capped collection
