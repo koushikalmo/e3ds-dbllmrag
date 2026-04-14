@@ -241,19 +241,17 @@ async def run_query(body: QueryRequest):
                 query_obj    = query_obj,
                 result_count = result_count,
             )
-            # Save to MongoDB chat history (user-facing history panel)
-            try:
-                await save_query(
-                    question        = body.question.strip(),
-                    collection      = body.collection,
-                    result_count    = result_count,
-                    result_label    = query_obj.get("resultLabel", ""),
-                    explanation     = query_obj.get("explanation", ""),
-                    elapsed_seconds = round(time.perf_counter() - start, 2),
-                )
-            except Exception as e:
-                # History save failure is non-fatal — the query result still returns
-                print(f"[/api/query] History save failed (non-fatal): {e}")
+            # Save to MongoDB chat history in background — do NOT await this.
+            # Awaiting it blocks the HTTP response until the MongoDB write
+            # completes, which can hang the browser request for minutes.
+            asyncio.create_task(save_query(
+                question        = body.question.strip(),
+                collection      = body.collection,
+                result_count    = result_count,
+                result_label    = query_obj.get("resultLabel", ""),
+                explanation     = query_obj.get("explanation", ""),
+                elapsed_seconds = round(time.perf_counter() - start, 2),
+            ))
 
         return JSONResponse(content={
             "success": True,
