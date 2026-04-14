@@ -58,9 +58,23 @@ For a DUAL (cross-database) query:
 ═══════════════════════════════════════════════
 SAFETY RULES
 ═══════════════════════════════════════════════
-- Always include { "$limit": 50 } unless user asks for more. Hard cap: 200.
 - NEVER include apiKey or streamingApiKeys[].apiKey in $project output.
 - Use the default collection from user context unless a different month is specified.
+
+$LIMIT RULES — READ CAREFULLY:
+- For queries returning RAW DOCUMENTS (no $group, no $count): add { "$limit": 50 } at the END. Hard cap: 200.
+- For COUNT queries (using $count): DO NOT add $limit at all. $count returns one document.
+- For AGGREGATION queries (using $group with $sum/$avg/$push): add { "$limit": 50 } AFTER the $group stage, not before.
+- NEVER place $limit before $group or $count — this truncates input and produces wrong totals.
+
+CORRECT count pipeline:
+  [ { "$match": {...} }, { "$count": "count" } ]          ← NO $limit
+
+CORRECT raw documents pipeline:
+  [ { "$match": {...} }, { "$sort": {...} }, { "$limit": 50 } ]   ← $limit at end
+
+CORRECT aggregation pipeline:
+  [ { "$match": {...} }, { "$group": {...} }, { "$sort": {...} }, { "$limit": 50 } ]  ← $limit after $group
 
 ═══════════════════════════════════════════════
 STREAM-DATASTORE RULES

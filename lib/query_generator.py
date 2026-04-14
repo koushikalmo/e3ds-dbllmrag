@@ -175,6 +175,113 @@ def _extract_json(raw: str) -> dict:
         )
 
 
+def _fix_pipeline_limits(pipeline: list) -> list:
+    """
+    Post-processes a generated pipeline to fix incorrect $limit placement.
+
+    The LLM frequently places $limit before $group/$count stages, which
+    truncates the input and produces wrong counts/totals. This function
+    detects and corrects that pattern deterministically, regardless of
+    what the LLM generated.
+
+    Rules applied:
+      1. If pipeline ends with $count  → remove ALL $limit stages.
+         ($count returns one doc; a limit is meaningless and wrong.)
+      2. If pipeline contains $group   → remove any $limit that appears
+         BEFORE the first $group, then ensure one $limit of ≤200 exists
+         after $group (add 50 if missing).
+      3. Otherwise (raw document query) → ensure $limit is at the END,
+         capped at 200. Move it if it's in the wrong position.
+
+    Returns a corrected copy of the pipeline.
+    """
+    if not pipeline:
+        return pipeline
+
+    # Helpers
+    def stage_op(stage):
+        """Returns the operator key of a pipeline stage, e.g. '$match'."""
+        return next(iter(stage), None) if isinstance(stage, dict) else None
+
+    def get_limit_value(stage):
+        return stage.get("$limit") if isinstance(stage, dict) else None
+
+    ops = [stage_op(s) for s in pipeline]
+
+    # ── Rule 1: count query → strip all $limit stages ──────────
+    if "$count" in ops:
+        fixed = [s for s in pipeline if stage_op(s) != "$limit"]
+        if len(fixed) != len(pipeline):
+            print(f"[pipeline-fix] Removed $limit from $count pipeline "
+                  f"({len(pipeline) - len(fixed)} removed)")
+        return fixed
+
+    # ── Rule 2: aggregation query ($group present) ─────────────
+    if "$group" in ops:
+        first_group_idx = ops.index("$group")
+
+        # Remove $limit stages that appear before $group
+        pre_limits  = [i for i, op in enumerate(ops) if op == "$limit" and i < first_group_idx]
+        post_limits = [i for i, op in enumerate(ops) if op == "$limit" and i > first_group_idx]
+
+        if pre_limits:
+            print(f"[pipeline-fix] Removed {len(pre_limits)} $limit stage(s) "
+                  f"before $group (was causing wrong totals)")
+
+        # Rebuild without pre-group limits
+        fixed = [s for i, s in enumerate(pipeline) if i not in pre_limits]
+
+        # Cap existing post-group limit at 200
+        for stage in fixed:
+            if stage_op(stage) == "$limit":
+                val = get_limit_value(stage)
+                if isinstance(val, int) and val > 200:
+                    stage["$limit"] = 200
+                    print(f"[pipeline-fix] Capped $limit to 200")
+
+        # Add $limit: 50 after $group if none exists after it
+        fixed_ops = [stage_op(s) for s in fixed]
+        if "$limit" not in fixed_ops[fixed_ops.index("$group"):]:
+            fixed.append({"$limit": 50})
+            print("[pipeline-fix] Added $limit: 50 after $group")
+
+        return fixed
+
+    # ── Rule 3: raw document query ─────────────────────────────
+    # Ensure exactly one $limit at the end, capped at 200.
+    limit_indices = [i for i, op in enumerate(ops) if op == "$limit"]
+
+    if not limit_indices:
+        # No limit — add one at the end
+        pipeline = list(pipeline) + [{"$limit": 50}]
+        return pipeline
+
+    # Keep only the last $limit, move it to the end, cap at 200
+    last_limit_stage = pipeline[limit_indices[-1]]
+    val = get_limit_value(last_limit_stage)
+    capped = min(val, 200) if isinstance(val, int) and val > 0 else 50
+
+    # Remove all $limit stages, re-append one at the end
+    fixed = [s for i, s in enumerate(pipeline) if stage_op(s) != "$limit"]
+    fixed.append({"$limit": capped})
+
+    if len(limit_indices) > 1 or limit_indices[0] != len(pipeline) - 1:
+        print(f"[pipeline-fix] Moved $limit: {capped} to end of pipeline")
+
+    return fixed
+
+
+def _fix_query_obj(query_obj: dict) -> dict:
+    """Applies _fix_pipeline_limits to all pipelines in a query object."""
+    if query_obj.get("queryType") == "single":
+        query_obj["pipeline"] = _fix_pipeline_limits(query_obj["pipeline"])
+    elif query_obj.get("queryType") == "dual":
+        for q in query_obj.get("queries", []):
+            if "pipeline" in q:
+                q["pipeline"] = _fix_pipeline_limits(q["pipeline"])
+    return query_obj
+
+
 def _validate_structure(obj: dict) -> dict:
     """
     Validates that the parsed JSON has the shape query_executor.py
@@ -548,6 +655,12 @@ async def generate_query(
             last_error = f"Structure validation error: {e}"
             print(f"[generator] Attempt {attempt} — Structure invalid: {e}")
             continue
+
+        # ── Fix $limit placement (deterministic, post-LLM) ────
+        # Corrects the common LLM mistake of placing $limit before
+        # $group/$count, which truncates input and produces wrong totals.
+        # This runs unconditionally on every attempt.
+        query_obj = _fix_query_obj(query_obj)
 
         # ── Validate field names ───────────────────────────────
         suspicious = _validate_field_names(query_obj)
