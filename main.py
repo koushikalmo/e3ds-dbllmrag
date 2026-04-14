@@ -218,6 +218,28 @@ async def run_query(body: QueryRequest):
         )
 
         result  = await execute_query(query_obj)
+
+        # ── Auto-analyze results with LLM ───────────────────────
+        # Run summarization immediately so the AI response is part
+        # of the query response — not a separate button click.
+        rows_for_analysis = result.get("results", [])
+        if isinstance(rows_for_analysis, dict):
+            rows_for_analysis = (
+                rows_for_analysis.get("merged") or
+                rows_for_analysis.get("primary") or []
+            )
+
+        ai_summary = None
+        if rows_for_analysis:
+            try:
+                analysis   = await summarize_results(
+                    results  = rows_for_analysis,
+                    question = body.question.strip(),
+                )
+                ai_summary = analysis.get("summary", "")
+            except Exception as e:
+                print(f"[/api/query] Auto-analysis failed (non-fatal): {e}")
+
         elapsed = round(time.perf_counter() - start, 2)
 
         # ── Auto-save to RAG example store ─────────────────────
@@ -264,6 +286,7 @@ async def run_query(body: QueryRequest):
             "success": True,
             "data": {
                 **result,
+                "aiSummary": ai_summary,
                 "meta": {
                     "question":       body.question.strip(),
                     "collectionUsed": collection,

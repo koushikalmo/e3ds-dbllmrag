@@ -107,23 +107,24 @@ class OllamaProvider:
     def name(self) -> str:
         return f"ollama:{self.model}"
 
-    async def generate(self, system_prompt: str, user_message: str) -> str:
+    async def generate(
+        self,
+        system_prompt: str,
+        user_message:  str,
+        json_mode:     bool = True,
+    ) -> str:
         """
         Calls the Ollama /api/chat endpoint and returns the model's text.
-
-        We use the chat endpoint (not /api/generate) because it
-        supports a dedicated system message role, which is important
-        for our schema-as-system-instruction pattern. The schema
-        goes in the system message so it's fully digested before
-        the model reads the user's question.
 
         Args:
             system_prompt: Full system instruction (schema + rules)
             user_message:  The user's question + collection context
+            json_mode:     When True, forces valid JSON output at the token
+                           level (used for query generation). Set False for
+                           free-text responses like result summarization.
 
         Returns:
-            Raw text from the model — always valid JSON when
-            "format": "json" is active.
+            Raw text from the model.
 
         Raises:
             RuntimeError: If Ollama is not running or the request fails.
@@ -134,14 +135,15 @@ class OllamaProvider:
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_message},
             ],
-            "format": "json",   # forces valid JSON output at token level
-            "stream": False,    # get the full response in one go
+            "stream": False,
             "options": {
-                "temperature": 0.1,       # near-deterministic output
+                "temperature": 0.1 if json_mode else 0.4,
                 "num_ctx":     self.num_ctx,
-                "num_predict": 2048,      # max tokens to generate
+                "num_predict": 2048,
             },
         }
+        if json_mode:
+            payload["format"] = "json"   # forces valid JSON at token level
 
         # 300 second timeout — our system prompt is ~4,500 tokens and with
         # RAG examples + output the total can reach 7,000+ tokens. On an
@@ -223,6 +225,7 @@ def get_ollama() -> OllamaProvider:
 async def generate_with_ollama(
     system_prompt: str,
     user_message:  str,
+    json_mode:     bool = True,
 ) -> tuple[str, str]:
     """
     Generates a response using the local Ollama LLM.
@@ -234,7 +237,7 @@ async def generate_with_ollama(
         RuntimeError: If Ollama is not running or the call fails.
     """
     provider = OllamaProvider()
-    text = await provider.generate(system_prompt, user_message)
+    text = await provider.generate(system_prompt, user_message, json_mode=json_mode)
     return text, provider.name
 
 
@@ -277,3 +280,17 @@ async def warmup_model() -> None:
 
 # Backward-compatible alias — query_generator.py calls this name
 generate_with_fallback = generate_with_ollama
+
+
+async def generate_text(
+    system_prompt: str,
+    user_message:  str,
+) -> tuple[str, str]:
+    """
+    Generates a free-text (non-JSON) response using Ollama.
+    Used by result_summarizer.py for natural language analysis.
+
+    Returns:
+        (response_text, provider_name)
+    """
+    return await generate_with_ollama(system_prompt, user_message, json_mode=False)

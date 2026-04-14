@@ -43,7 +43,7 @@ import json
 import asyncio
 from typing import Any
 
-from lib.llm_provider import generate_with_fallback
+from lib.llm_provider import generate_text
 
 # ── Configuration ─────────────────────────────────────────────
 # How many documents per chunk. Adjust if you hit context limits.
@@ -171,7 +171,7 @@ async def _summarize_chunk(
         f"Be brief (3-5 sentences). Focus on patterns, not individual records."
     )
 
-    text, provider = await generate_with_fallback(system_prompt, user_message)
+    text, provider = await generate_text(system_prompt, user_message)
     print(f"[summarizer] Chunk {chunk_index}/{total_chunks} summarized via {provider}")
     return text.strip()
 
@@ -214,7 +214,7 @@ async def _synthesize_summaries(
         f"Start with a direct answer, then provide supporting details."
     )
 
-    text, provider = await generate_with_fallback(system_prompt, user_message)
+    text, provider = await generate_text(system_prompt, user_message)
     print(f"[summarizer] Final synthesis via {provider}")
     return text.strip()
 
@@ -288,7 +288,7 @@ async def summarize_results(
             f"Please analyze these results and provide a clear, direct answer."
         )
 
-        text, provider = await generate_with_fallback(system_prompt, user_message)
+        text, provider = await generate_text(system_prompt, user_message)
         print(f"[summarizer] Direct analysis completed via {provider}")
 
         return {
