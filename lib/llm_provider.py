@@ -251,23 +251,28 @@ async def warmup_model() -> None:
     pulled, this silently does nothing. The query endpoint will show
     a proper error when the user actually submits a query.
     """
+    print(f"[llm] Warming up '{OLLAMA_MODEL}' (loading into GPU VRAM)…")
     try:
-        async with httpx.AsyncClient(timeout=180.0) as client:
+        # Use /api/chat with format:json — the same endpoint real queries use —
+        # so Ollama caches the exact model state needed for pipeline generation.
+        async with httpx.AsyncClient(timeout=240.0) as client:
             r = await client.post(
-                f"{OLLAMA_BASE_URL}/api/generate",
+                f"{OLLAMA_BASE_URL}/api/chat",
                 json={
-                    "model":      OLLAMA_MODEL,
-                    "prompt":     "hi",
-                    "stream":     False,
-                    "keep_alive": "10m",   # keep loaded for 10 minutes
+                    "model":   OLLAMA_MODEL,
+                    "messages": [{"role": "user", "content": "respond with {\"ok\":true}"}],
+                    "format":  "json",
+                    "stream":  False,
+                    "options": {"temperature": 0, "num_predict": 10},
+                    "keep_alive": "30m",
                 },
             )
         if r.status_code == 200:
-            print(f"[llm] Model '{OLLAMA_MODEL}' warmed up and ready.")
+            print(f"[llm] '{OLLAMA_MODEL}' is warm and ready.")
         else:
-            print(f"[llm] Warmup returned HTTP {r.status_code} — model may still be loading.")
+            print(f"[llm] Warmup HTTP {r.status_code} — first query may be slow.")
     except Exception as e:
-        print(f"[llm] Warmup skipped: {e}")
+        print(f"[llm] Warmup skipped ({e}) — first query will load the model.")
 
 
 # Backward-compatible alias — query_generator.py calls this name

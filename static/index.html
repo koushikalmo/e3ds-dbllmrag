@@ -686,18 +686,26 @@ async function submitQuery(overrideQuestion) {
     if (loadingText.textContent.includes("pipeline"))
       loadingText.textContent = "Running query against MongoDB…";
   }, 3000);
+  setTimeout(() => {
+    if (loadingBar.style.display !== "none")
+      loadingText.textContent = "Still working… (first query loads the model into GPU — up to 60s)";
+  }, 20_000);
+  setTimeout(() => {
+    if (loadingBar.style.display !== "none")
+      loadingText.textContent = "Almost there… LLM is generating the pipeline";
+  }, 60_000);
 
   // AbortController lets the STOP button cancel the in-flight request.
   _timedOut   = false;
   activeAbort = new AbortController();
 
-  // Safety net: if a query takes more than 120s (Ollama cold-start can take
-  // 60-90s to load the model into VRAM on first run) the fetch may never
-  // resolve. Reset loading state so the button doesn't stay permanently disabled.
+  // Safety net: 270s matches Python-side Ollama timeout (300s) minus buffer.
+  // On first server start the model loads from disk into VRAM (~30-60s on GPU)
+  // before generation begins. Subsequent queries are much faster (~5-15s).
   const safetyTimer = setTimeout(() => {
     _timedOut = true;
     if (activeAbort) activeAbort.abort();
-  }, 120_000);
+  }, 270_000);
 
   // Hide any previous analysis
   analysisBar.style.display = "none";
@@ -738,7 +746,7 @@ async function submitQuery(overrideQuestion) {
   } catch (err) {
     if (err.name === "AbortError") {
       if (_timedOut) {
-        showPanel("error", "Query timed out. Ollama may be loading the model (first query takes 60-90s). Please try again.");
+        showPanel("error", "Query timed out after 4.5 min. Check that Ollama is running and using your GPU (run: ollama ps). If VRAM shows 0, CUDA drivers may not be set up — see the setup guide.");
       } else {
         showPanel("empty");   // user clicked STOP — go back to idle, no error
       }
