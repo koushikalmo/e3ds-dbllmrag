@@ -1,486 +1,360 @@
-# ============================================================
-# lib/query_executor.py — Safe Async MongoDB Query Executor
-# ============================================================
-# This module takes the validated query dict from
-# query_generator.py and actually runs it against MongoDB.
-#
-# SAFETY FIRST:
-# ─────────────
-# We run an analytics tool that regular users can query with
-# plain English. We NEVER want a generated pipeline to:
-#   - Write data ($out, $merge) → we strip these stages
-#   - Return thousands of docs → we enforce a hard $limit
-#   - Run forever → we set maxTimeMS on every aggregation
-#   - Leak encrypted API keys → we project them away
-#
-# HOW SINGLE QUERIES WORK:
-# ──────────────────────────
-# 1. Sanitize the pipeline (remove write stages)
-# 2. Enforce the document limit
-# 3. Run aggregation with allowDiskUse + timeout
-# 4. Convert BSON types to JSON-safe Python types
-# 5. Return the docs + a summary
-#
-# HOW DUAL QUERIES WORK:
-# ────────────────────────
-# MongoDB cannot $lookup across different cluster URIs.
-# Instead, we run two separate pipelines in parallel using
-# asyncio.gather(), which starts both at the same time and
-# waits for both to finish. Then we merge the results in
-# Python memory using the owner username as the join key.
-#
-# Example timing with asyncio.gather():
-#   Without: stream query (2s) + appconfigs query (1s) = 3s total
-#   With:    both run simultaneously → 2s total (the slower one)
-# ============================================================
+# lib/query_executor.py
+# Executes validated query objects against MongoDB.
+# Handles four operation types: aggregate, countDocuments, find, distinct.
+# Also applies diacritic normalization and sanitizes problematic fields.
 
+import re
 import asyncio
-import os
 from typing import Any
 
 from lib.db_registry import get_db, get_default_collection
 
-# ── Safety constants ──────────────────────────────────────────
-MAX_RESULTS   = 200      # hard cap: never return more than this many docs
-QUERY_TIMEOUT = 15_000   # milliseconds → 15 seconds max per query
+MAX_RESULTS   = 200
+QUERY_TIMEOUT = 15_000   # ms
 
-# MongoDB pipeline stages that write data — we never allow these.
-# $out  → writes results to a new collection (destructive)
-# $merge → merges results into an existing collection (destructive)
 _WRITE_STAGES = frozenset({"$out", "$merge"})
 
+# Fields that should use regex for matching so "Bogota" also finds "Bogotá"
+_PARTIAL_MATCH_FIELDS = frozenset({
+    "clientInfo.city",
+    "clientInfo.country_name",
+    "clientInfo.region",
+    "appInfo.appName",
+    "userDeviceInfo.os.name",
+    "userDeviceInfo.client.name",
+    "elInfo.computerName",
+})
 
-# ────────────────────────────────────────────────────────────
-# PIPELINE SAFETY FILTERS
-# ────────────────────────────────────────────────────────────
+# This field is rarely present in documents; filtering on it always returns 0
+_PROBLEMATIC_FIELDS = frozenset({"loggedInUserData"})
+
+# ASCII letter → diacritic character class for regex expansion
+_DIACRITIC_MAP: dict[str, str] = {
+    "a": "aáàâäãåā", "e": "eéèêëē", "i": "iíìîïī",
+    "o": "oóòôöõøō", "u": "uúùûüū", "n": "nñ",
+    "c": "cç",       "s": "sś",     "z": "zźż",
+}
+
+
+# ── Diacritic expansion ───────────────────────────────────────
+
+def _expand_diacritics(text: str) -> str:
+    """Convert a string to a regex that also matches accented variants.
+
+    "Bogota" → "b[oóòôöõøō]g[oóòôöõøō]t[aáàâäãåā]"
+    Used with $options:"i" for case insensitivity.
+    """
+    parts = []
+    for ch in text.lower():
+        if ch in _DIACRITIC_MAP:
+            parts.append(f"[{_DIACRITIC_MAP[ch]}]")
+        elif ch.isalpha():
+            parts.append(ch)
+        else:
+            parts.append(re.escape(ch))
+    return "".join(parts)
+
+
+def _normalize_match_query(query: dict) -> dict:
+    """Normalize a MongoDB match filter for better accuracy.
+
+    1. Strip fields that are never present and cause zero results.
+    2. Convert plain string values on geographic/name fields to
+       diacritic-aware regex so "Bogota" matches "Bogotá".
+    3. Recurse into $and / $or / $nor.
+    """
+    if not isinstance(query, dict):
+        return query
+
+    result = {}
+    for key, val in query.items():
+        if key in _PROBLEMATIC_FIELDS:
+            continue  # silently strip — this field causes 0 results
+
+        if key in ("$and", "$or", "$nor") and isinstance(val, list):
+            result[key] = [_normalize_match_query(v) for v in val]
+            continue
+
+        if key in _PARTIAL_MATCH_FIELDS:
+            if isinstance(val, str):
+                result[key] = {"$regex": _expand_diacritics(val), "$options": "i"}
+            elif isinstance(val, dict) and isinstance(val.get("$eq"), str):
+                result[key] = {"$regex": _expand_diacritics(val["$eq"]), "$options": "i"}
+            else:
+                result[key] = val  # already a regex / $in / etc — leave it
+        else:
+            result[key] = val
+
+    return result
+
+
+def _normalize_pipeline(pipeline: list) -> list:
+    """Apply _normalize_match_query to every $match stage in a pipeline."""
+    return [
+        {"$match": _normalize_match_query(s["$match"])} if "$match" in s else s
+        for s in pipeline
+    ]
+
+
+# ── Pipeline safety ───────────────────────────────────────────
 
 def _sanitize_pipeline(pipeline: list) -> list:
-    """
-    Removes any $out or $merge stages from the pipeline.
-
-    Even with a perfectly crafted system prompt, the LLM might
-    occasionally generate a write stage. This is our last line
-    of defense to ensure the tool stays read-only.
-
-    We log a warning when this happens so it's visible in
-    server output — it helps spot if the prompt needs improving.
-
-    Example input:
-        [{ "$group": {...} }, { "$out": "temp_results" }]
-    Example output:
-        [{ "$group": {...} }]   ← $out stripped silently
-    """
+    """Remove $out and $merge — keep the tool read-only."""
     clean = []
     for stage in pipeline:
-        # Each stage is a dict with one key (the operator name)
-        stage_name = next(iter(stage), None)
-        if stage_name in _WRITE_STAGES:
-            print(
-                f"[executor] SECURITY: Stripped write stage '{stage_name}' "
-                "from generated pipeline. Check the system prompt."
-            )
+        op = next(iter(stage), None)
+        if op in _WRITE_STAGES:
+            print(f"[executor] SECURITY: stripped '{op}' stage")
         else:
             clean.append(stage)
     return clean
 
 
 def _enforce_limit(pipeline: list) -> list:
-    """
-    Ensures the pipeline always has a $limit ≤ MAX_RESULTS.
-
-    Two cases:
-    1. No $limit in pipeline → we append one.
-       This handles queries like "list all sessions" that would
-       otherwise dump the entire collection.
-
-    2. $limit present but too large → clamp it down.
-       The LLM might generate { "$limit": 500 } despite the
-       system prompt saying 50. We cap at MAX_RESULTS (200).
-
-    We preserve the position of an existing $limit in the pipeline
-    rather than always appending at the end, because $limit placed
-    early (before $group, etc.) can change semantics.
-    """
-    has_limit = any("$limit" in stage for stage in pipeline)
-
+    """Ensure pipeline always has a $limit ≤ MAX_RESULTS."""
+    has_limit = any("$limit" in s for s in pipeline)
     if not has_limit:
-        # Add $limit at the end — safest default position
         return pipeline + [{"$limit": MAX_RESULTS}]
-
-    # Clamp any $limit that exceeds our maximum
-    result = []
-    for stage in pipeline:
-        if "$limit" in stage:
-            original = stage["$limit"]
-            if original > MAX_RESULTS:
-                print(
-                    f"[executor] Clamped $limit from {original} → {MAX_RESULTS}"
-                )
-                result.append({"$limit": MAX_RESULTS})
-            else:
-                result.append(stage)
-        else:
-            result.append(stage)
-    return result
+    return [
+        {"$limit": min(s["$limit"], MAX_RESULTS)} if "$limit" in s else s
+        for s in pipeline
+    ]
 
 
 def _prepare_pipeline(pipeline: list) -> list:
-    """
-    Applies all safety transforms in one call.
-    Called once before every aggregation run.
-    """
     return _enforce_limit(_sanitize_pipeline(pipeline))
 
 
-# ────────────────────────────────────────────────────────────
-# DATABASE ROUTING
-# ────────────────────────────────────────────────────────────
+# ── Database routing ──────────────────────────────────────────
 
 def _get_db(database: str):
-    """
-    Returns the correct Motor database handle given a database name.
-
-    Looks the name up in the db_registry so any registered database
-    works — not just the original two. Adding a new database to
-    data/db_registry.json makes it instantly queryable here.
-
-    Raises ValueError for names not in the registry (LLM hallucination).
-    """
     try:
         return get_db(database)
     except ValueError:
-        raise ValueError(
-            f"Unknown database '{database}'. "
-            "The LLM generated a database name that isn't registered. "
-            "Valid databases are listed in data/db_registry.json."
-        )
+        raise ValueError(f"Unknown database '{database}'. Check data/db_registry.json.")
 
 
 def _resolve_collection(database: str, collection: str) -> str:
-    """
-    Resolves the collection name to use for a query.
-
-    Uses db_registry to look up the database's default collection.
-    If no default exists (e.g. appConfigs, where each collection is
-    a different owner) and the LLM didn't provide one, raises ValueError.
-    """
     if collection:
         return collection
-
     default = get_default_collection(database)
     if default:
         return default
-
     raise ValueError(
-        f"Query for '{database}' is missing a collection name, "
-        f"and '{database}' has no default collection. "
-        "The collection name must be specified explicitly. "
-        "For appConfigs this is the owner's username (e.g. 'eduardo'). "
-        "Try rephrasing your question to include the specific name."
+        f"No collection specified for '{database}' and no default is configured. "
+        "For appConfigs, provide the owner's username as the collection name."
     )
 
 
-# ────────────────────────────────────────────────────────────
-# RESULT PROCESSING
-# ────────────────────────────────────────────────────────────
+# ── BSON serialization ────────────────────────────────────────
 
 def _make_serializable(docs: list[dict]) -> list[dict]:
-    """
-    Converts MongoDB-specific types into plain Python types
-    so FastAPI can serialize them to JSON.
-
-    Motor returns documents with types that the standard json
-    module doesn't know how to handle:
-
-    - ObjectId → looks like: ObjectId('64a3f1c2...'), a 12-byte
-      MongoDB unique ID. We convert to its hex string.
-
-    - Decimal128 → MongoDB's high-precision decimal type.
-      We convert to Python float (loses some precision but
-      fine for display purposes).
-
-    The conversion is recursive so it handles nested objects
-    and arrays — which is important because our documents
-    have many levels of nesting (clientInfo.fullInfo.timezone, etc.)
-    """
+    """Convert ObjectId and Decimal128 to JSON-safe Python types."""
     import bson
 
     def convert(val: Any) -> Any:
-        if isinstance(val, bson.ObjectId):
-            return str(val)            # "64a3f1c2abcdef1234567890"
-        if isinstance(val, bson.Decimal128):
-            return float(str(val))     # Decimal128("49758") → 49758.0
-        if isinstance(val, dict):
-            return {k: convert(v) for k, v in val.items()}
-        if isinstance(val, list):
-            return [convert(i) for i in val]
-        return val  # int, float, str, bool, None → pass through unchanged
+        if isinstance(val, bson.ObjectId):    return str(val)
+        if isinstance(val, bson.Decimal128):  return float(str(val))
+        if isinstance(val, dict):             return {k: convert(v) for k, v in val.items()}
+        if isinstance(val, list):             return [convert(i) for i in val]
+        return val
 
     return [convert(doc) for doc in docs]
 
 
 def _summarize(results: list[dict]) -> dict:
-    """
-    Generates a quick summary for the frontend's result header.
-
-    The frontend displays: "42 records · 1.3s"
-    The "42 records" count comes from summary["count"].
-    The "sample" field holds the first 5 documents as a preview
-    (used in future for potential "quick look" features).
-    """
-    return {
-        "count":  len(results),
-        "sample": results[:5],
-    }
+    return {"count": len(results), "sample": results[:5]}
 
 
-# ────────────────────────────────────────────────────────────
-# QUERY RUNNERS
-# ────────────────────────────────────────────────────────────
+# ── Query runners ─────────────────────────────────────────────
 
-async def _run_single(
-    database:     str,
-    collection:   str,
-    raw_pipeline: list,
-) -> list[dict]:
-    """
-    Executes one aggregation pipeline against MongoDB.
+async def _run_aggregate(database: str, collection: str, raw_pipeline: list) -> list[dict]:
+    """Run an aggregation pipeline with diacritic normalization and safety guards."""
+    db        = _get_db(database)
+    coll_name = _resolve_collection(database, collection)
+    pipeline  = _prepare_pipeline(_normalize_pipeline(raw_pipeline))
 
-    WHY allowDiskUse=True?
-    ──────────────────────
-    MongoDB's in-memory sort limit is 100MB per aggregation.
-    If you sort a large collection without an index, you'll
-    hit this limit and the query will fail with an error.
-    allowDiskUse=True lets MongoDB spill to disk for large
-    sorts, at the cost of some performance. For an analytics
-    tool with ad-hoc queries, this is the right trade-off.
+    print(f"[executor] aggregate {database}/{coll_name} ({len(pipeline)} stages)")
+    try:
+        cursor  = db[coll_name].aggregate(pipeline, allowDiskUse=True, maxTimeMS=QUERY_TIMEOUT)
+        results = await cursor.to_list(length=MAX_RESULTS)
+        return _make_serializable(results)
+    except Exception as err:
+        _raise_friendly(err, database, coll_name)
 
-    WHY maxTimeMS=15000?
-    ─────────────────────
-    Without a time limit, a poorly generated pipeline on a
-    large collection could run for minutes. This would tie
-    up a MongoDB connection and eventually time out the user's
-    browser request anyway. Setting a 15-second limit on the
-    MongoDB server side means:
-    1. The query aborts immediately on the DB side (not just
-       the client side), freeing resources.
-    2. We can return a helpful "query timed out" message to
-       the user with advice to add a more specific filter.
 
-    Args:
-        database:     "stream-datastore" or "appConfigs"
-        collection:   Collection name (e.g. "Apr_2025", "users")
-        raw_pipeline: The pipeline from the LLM, before safety transforms
+async def _run_count_documents(database: str, collection: str, query: dict) -> list[dict]:
+    """Exact count via count_documents() — no pipeline, no $limit interference.
 
-    Returns:
-        List of serializable dicts, ready for JSON response.
-
-    Raises:
-        TimeoutError: If MongoDB kills the query for taking too long.
-        ValueError:   If the collection doesn't exist.
+    This is the only correct way to count. Using aggregate+$count lets the LLM
+    accidentally place $limit before $count and get a wrong (smaller) number.
     """
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
-    pipeline  = _prepare_pipeline(raw_pipeline)
+    clean     = _normalize_match_query(query or {})
 
-    print(
-        f"[executor] Running {database}/{coll_name} "
-        f"— {len(pipeline)} pipeline stages"
-    )
-
+    print(f"[executor] countDocuments {database}/{coll_name}")
     try:
-        cursor = db[coll_name].aggregate(
-            pipeline,
-            allowDiskUse=True,    # spill to disk for large sorts
-            maxTimeMS=QUERY_TIMEOUT,
-        )
-        # to_list(length=MAX_RESULTS) fetches all results up to MAX_RESULTS
-        # documents. Motor fetches them in batches from the cursor.
-        results = await cursor.to_list(length=MAX_RESULTS)
-        return _make_serializable(results)
-
+        count = await db[coll_name].count_documents(clean, maxTimeMS=QUERY_TIMEOUT)
+        return [{"count": count}]
     except Exception as err:
-        err_str = str(err)
+        _raise_friendly(err, database, coll_name)
 
-        # Map common MongoDB error conditions to friendly messages
-        if "MaxTimeMSExpired" in err_str or "exceeded time limit" in err_str.lower():
-            raise TimeoutError(
-                f"The query took longer than {QUERY_TIMEOUT // 1000} seconds. "
-                "Try adding a more specific filter (e.g. specify an owner name, "
-                "date range, or country) to reduce the amount of data scanned."
-            )
 
-        if "NamespaceNotFound" in err_str:
-            if database == "stream-datastore":
-                raise ValueError(
-                    f"Collection '{coll_name}' does not exist in stream-datastore. "
-                    "Monthly collections follow the format 'Apr_2025', 'Mar_2025', etc. "
-                    "The collection might not have data yet, or the name is misspelled."
-                )
-            else:
-                raise ValueError(
-                    f"Owner collection '{coll_name}' does not exist in appConfigs. "
-                    "In appConfigs, each collection is named after an owner username. "
-                    "Check that the owner name is spelled correctly."
-                )
+async def _run_find(
+    database:   str,
+    collection: str,
+    query:      dict,
+    projection: dict | None = None,
+    sort:       dict | None = None,
+    limit:      int = 50,
+) -> list[dict]:
+    """Cursor-based find with optional projection and sort."""
+    db        = _get_db(database)
+    coll_name = _resolve_collection(database, collection)
+    clean     = _normalize_match_query(query or {})
+    limit     = min(limit or 50, MAX_RESULTS)
 
-        if "BSONObjectTooLarge" in err_str:
+    print(f"[executor] find {database}/{coll_name} (limit={limit})")
+    try:
+        cursor = db[coll_name].find(clean, projection or {})
+        if sort:
+            cursor = cursor.sort(list(sort.items()))
+        cursor  = cursor.max_time_ms(QUERY_TIMEOUT).limit(limit)
+        results = await cursor.to_list(length=limit)
+        return _make_serializable(results)
+    except Exception as err:
+        _raise_friendly(err, database, coll_name)
+
+
+async def _run_distinct(
+    database:   str,
+    collection: str,
+    field:      str,
+    query:      dict | None = None,
+) -> list[dict]:
+    """Distinct field values returned as [{"value": v}, ...] for consistent rendering."""
+    db        = _get_db(database)
+    coll_name = _resolve_collection(database, collection)
+    clean     = _normalize_match_query(query or {})
+
+    print(f"[executor] distinct '{field}' {database}/{coll_name}")
+    try:
+        values = await db[coll_name].distinct(field, clean)
+        return [{"value": v} for v in values[:MAX_RESULTS] if v is not None]
+    except Exception as err:
+        _raise_friendly(err, database, coll_name)
+
+
+def _raise_friendly(err: Exception, database: str, coll_name: str):
+    """Re-raise MongoDB errors with human-readable messages."""
+    s = str(err)
+    if "MaxTimeMSExpired" in s or "exceeded time limit" in s.lower():
+        raise TimeoutError(
+            f"Query exceeded {QUERY_TIMEOUT // 1000}s. "
+            "Add a more specific filter (owner name, date range, country) to reduce data scanned."
+        )
+    if "NamespaceNotFound" in s:
+        if database == "stream-datastore":
             raise ValueError(
-                "A query result document exceeded MongoDB's 16MB limit. "
-                "Try adding a $project stage to return fewer fields."
+                f"Collection '{coll_name}' doesn't exist in stream-datastore. "
+                "Monthly collections use format 'Apr_2025'. It may not have data yet."
             )
+        raise ValueError(
+            f"Owner collection '{coll_name}' doesn't exist in appConfigs. "
+            "Check that the owner username is spelled correctly."
+        )
+    if "BSONObjectTooLarge" in s:
+        raise ValueError("Result document exceeded 16MB. Add a $project to return fewer fields.")
+    raise err
 
-        # Re-raise anything else unchanged
-        raise
+
+# Keep the old name in case any internal callers use it
+_run_single = _run_aggregate
 
 
-# ────────────────────────────────────────────────────────────
-# MAIN EXPORT
-# ────────────────────────────────────────────────────────────
+# ── Main entry point ──────────────────────────────────────────
 
 async def execute_query(query_obj: dict) -> dict:
-    """
-    Executes a validated query object and returns structured results.
+    """Execute a validated query object. Dispatches by queryType and operation."""
 
-    This is the only function external code (main.py) calls.
-    It handles both 'single' and 'dual' query types.
-
-    SINGLE QUERY FLOW:
-        Run one pipeline → return results + summary + metadata
-
-    DUAL QUERY FLOW:
-        1. Run both pipelines simultaneously with asyncio.gather()
-        2. If query_obj has a mergeKey, merge the two result sets
-           in Python memory using that key as the join field.
-        3. The merge works by building a lookup dict from the
-           smaller (appConfigs) result set, then enriching each
-           doc from the larger (stream) result set.
-
-    HOW THE MERGE WORKS:
-        Let's say we asked "Which active owners had sessions?"
-        appConfigs results:  [{ "_id": "eduardo" }, { "_id": "imerza" }]
-        stream results:      [{ "_id": "eduardo", "count": 42 }, { "_id": "Lunas", "count": 7 }]
-
-        We build: config_map = { "eduardo": {...}, "imerza": {...} }
-        We loop through stream results:
-          - "eduardo" → found in config_map → add "_configData" field
-          - "Lunas"   → NOT in config_map → skip (no config data)
-
-        The merged result has "eduardo" enriched with config info,
-        and "Lunas" with no config data (they're not in appConfigs
-        or their subscription doesn't match).
-
-    Args:
-        query_obj: Validated dict from query_generator.generate_query()
-
-    Returns:
-        Dict shaped for the JSON response to the frontend:
-        {
-            "queryType": "single"|"dual",
-            "results": [...] or { "primary": [...], "secondary": [...], "merged": [...] },
-            "summary": { "count": N, "sample": [...] },
-            "explanation": "...",
-            "resultLabel": "...",
-            "executedPipeline": [...] (single queries only)
-        }
-    """
-
-    # ── Single database query ──────────────────────────────────
+    # ── Single query ──────────────────────────────────────────
     if query_obj["queryType"] == "single":
-        results = await _run_single(
-            database     = query_obj["database"],
-            collection   = query_obj.get("collection", ""),
-            raw_pipeline = query_obj["pipeline"],
-        )
+        operation = query_obj.get("operation", "aggregate")
+        db        = query_obj["database"]
+        coll      = query_obj.get("collection", "")
 
-        print(f"[executor] Single query returned {len(results)} documents")
+        if operation == "countDocuments":
+            results = await _run_count_documents(db, coll, query_obj.get("query", {}))
 
+        elif operation == "find":
+            results = await _run_find(
+                db, coll,
+                query      = query_obj.get("query", {}),
+                projection = query_obj.get("projection"),
+                sort       = query_obj.get("sort"),
+                limit      = query_obj.get("limit", 50),
+            )
+
+        elif operation == "distinct":
+            results = await _run_distinct(db, coll,
+                field = query_obj.get("field", ""),
+                query = query_obj.get("query", {}),
+            )
+
+        else:  # aggregate (default)
+            results = await _run_aggregate(db, coll, query_obj["pipeline"])
+
+        print(f"[executor] {operation} → {len(results)} result(s)")
         return {
             "queryType":        "single",
+            "operation":        operation,
             "results":          results,
             "summary":          _summarize(results),
             "explanation":      query_obj.get("explanation", ""),
-            "resultLabel":      query_obj.get("resultLabel", "Query Results"),
-            # We return the sanitized+limited pipeline (not the raw one)
-            # so the user sees exactly what was executed, not what the LLM generated.
-            "executedPipeline": _prepare_pipeline(query_obj["pipeline"]),
+            "resultLabel":      query_obj.get("resultLabel", "Results"),
+            "executedPipeline": query_obj.get("pipeline", []),
         }
 
-    # ── Dual database query ────────────────────────────────────
+    # ── Dual query ─────────────────────────────────────────────
     if query_obj["queryType"] == "dual":
         q1, q2 = query_obj["queries"]
 
-        # asyncio.gather() starts BOTH queries at the same time.
-        # Neither one waits for the other. Total time ≈ max(t1, t2)
-        # instead of t1 + t2. For a 2s stream query + 1s config
-        # query, this saves 1 second on every dual request.
         print("[executor] Running dual query in parallel…")
         results1, results2 = await asyncio.gather(
-            _run_single(q1["database"], q1.get("collection", ""), q1["pipeline"]),
-            _run_single(q2["database"], q2.get("collection", ""), q2["pipeline"]),
+            _run_aggregate(q1["database"], q1.get("collection", ""), q1["pipeline"]),
+            _run_aggregate(q2["database"], q2.get("collection", ""), q2["pipeline"]),
         )
+        print(f"[executor] Dual: primary={len(results1)}, secondary={len(results2)}")
 
-        print(
-            f"[executor] Dual query: "
-            f"primary={len(results1)} docs, secondary={len(results2)} docs"
-        )
-
-        # ── In-memory merge by owner key ───────────────────────
-        # Only performed if the LLM included a "mergeKey" field.
-        # mergeKey is usually "owner" — telling us to join on
-        # appInfo.owner (stream) ↔ _id (appConfigs).
+        # In-memory join by owner key if mergeKey is specified
         merged = None
-        merge_key = query_obj.get("mergeKey")
-
-        if merge_key:
-            # Build a fast lookup dict from results2 (usually appConfigs,
-            # which is smaller). Key = the owner name from _id field.
+        if merge_key := query_obj.get("mergeKey"):
+            # Build lookup from secondary (appConfigs) results
             config_map = {
                 str(doc.get(merge_key) or doc.get("_id", "")): doc
                 for doc in results2
             }
-
-            # Walk through results1 (stream data) and attach config
-            # info to any document whose owner matches
             merged = []
             for doc in results1:
-                # The owner might be at doc["owner"] (if $grouped by owner)
-                # or at doc["appInfo"]["owner"] (if returning raw sessions)
                 owner = str(
                     doc.get(merge_key)
                     or doc.get("appInfo", {}).get("owner", "")
                     or ""
                 )
-                enriched = dict(doc)  # copy so we don't mutate the original
+                enriched = dict(doc)
                 if owner and owner in config_map:
-                    # Attach the config document as a nested field
-                    # The frontend can display it in the table or JSON view
                     enriched["_configData"] = config_map[owner]
                 merged.append(enriched)
-
-            print(
-                f"[executor] Merged {len(merged)} docs "
-                f"({sum(1 for d in merged if '_configData' in d)} with config data)"
-            )
+            matched = sum(1 for d in merged if "_configData" in d)
+            print(f"[executor] Merged {len(merged)} docs, {matched} with config data")
 
         return {
-            "queryType": "dual",
-            "results": {
-                "primary":   results1,  # first query (usually stream-datastore)
-                "secondary": results2,  # second query (usually appConfigs)
-                "merged":    merged,    # None if no mergeKey was specified
-            },
-            "summary": {
-                "primary":   _summarize(results1),
-                "secondary": _summarize(results2),
-            },
+            "queryType":   "dual",
+            "results":     {"primary": results1, "secondary": results2, "merged": merged},
+            "summary":     {"primary": _summarize(results1), "secondary": _summarize(results2)},
             "explanation": query_obj.get("explanation", ""),
             "resultLabel": query_obj.get("resultLabel", "Cross-Database Results"),
         }
 
-    # This should never be reached — _validate_query_object() in
-    # query_generator.py enforces valid queryType values. But
-    # it's good practice to be explicit about the fallthrough.
-    raise ValueError(
-        f"[executor] Unsupported queryType: '{query_obj.get('queryType')}'"
-    )
+    raise ValueError(f"Unsupported queryType: '{query_obj.get('queryType')}'")

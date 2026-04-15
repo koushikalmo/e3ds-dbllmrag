@@ -1,21 +1,6 @@
-# ============================================================
-# main.py — FastAPI Application Entry Point
-# ============================================================
-# Wires everything together: routes, middleware, startup/shutdown.
-#
-# STARTUP SEQUENCE:
-#   1. Connect to MongoDB (lazy — first request triggers it)
-#   2. Run live schema discovery (samples both databases to
-#      extract real field paths and cache them for 1 hour)
-#   3. Start serving requests
-#
-# KEY ROUTES:
-#   GET  /              → serves the browser UI
-#   GET  /api/health    → pings both MongoDB databases
-#   GET  /api/status    → shows Ollama LLM status
-#   POST /api/query     → main query endpoint (NL → MongoDB → results)
-#   POST /api/analyze   → AI analysis of query results with chunking
-# ============================================================
+# main.py — FastAPI app entry point
+# Routes: GET / | GET /api/health | GET /api/status | POST /api/query | POST /api/analyze
+# Startup: warm LLM → warm live data cache → discover schema fields → index RAG examples
 
 import os
 import time
@@ -23,9 +8,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-# CRITICAL: load .env BEFORE importing lib modules — they read
-# env vars at import time (e.g. OLLAMA_BASE_URL = os.getenv(...)).
-load_dotenv()
+load_dotenv()  # must run before importing lib modules — they read env vars at import time
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse
@@ -33,16 +16,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from lib.mongodb           import close_connections, ping_databases
-from lib.query_generator   import generate_query, save_successful_query
-from lib.query_executor    import execute_query
-from lib.result_summarizer import summarize_results
-from lib.llm_provider      import OllamaProvider, OLLAMA_MODEL, warmup_model
-from lib.schema_discovery  import refresh_schema_cache, get_cache_status
-from lib.query_examples    import get_example_count
-from lib.chat_history      import save_query, get_history, delete_entry, clear_all
-from lib.query_examples    import index_all_examples_async
-from lib.session_memory    import add_turn, get_context_text, clear_session, active_session_count
+from lib.mongodb            import close_connections, ping_databases
+from lib.query_generator    import generate_query, save_successful_query
+from lib.query_executor     import execute_query
+from lib.result_summarizer  import summarize_results
+from lib.llm_provider       import OllamaProvider, OLLAMA_MODEL, warmup_model
+from lib.schema_discovery   import refresh_schema_cache, get_cache_status
+from lib.live_data_context  import warm_all_caches, get_cache_status as get_live_cache_status
+from lib.query_examples     import get_example_count
+from lib.chat_history       import save_query, get_history, delete_entry, clear_all
+from lib.query_examples     import index_all_examples_async
+from lib.session_memory     import add_turn, get_context_text, clear_session, active_session_count
 from lib.collection_resolver import resolve_and_log
 
 
@@ -60,21 +44,12 @@ async def lifespan(app: FastAPI):
     print(f"  RAG examples: {get_example_count()} in store")
     print("═" * 56)
 
-    # Kick off live schema discovery in the background.
-    # This also triggers embedding of discovered fields into the
-    # vector store (if nomic-embed-text is available in Ollama).
-    asyncio.create_task(
-        refresh_schema_cache(stream_collection=default_collection)
-    )
-
-    # Index all stored examples (bootstrap + past queries) into the
-    # vector store so semantic search is ready from the first query.
-    # No-op if embeddings are unavailable — keyword search is used instead.
-    asyncio.create_task(index_all_examples_async())
-
-    # Pre-warm the query LLM so the first user query doesn't stall
-    # waiting for the 4GB model to load from disk (60-90s cold-start).
-    asyncio.create_task(warmup_model())
+    # All four tasks run concurrently in the background.
+    # By the time the LLM finishes warming (60–90s), data caches are ready.
+    asyncio.create_task(warmup_model())                                   # load LLM into GPU
+    asyncio.create_task(warm_all_caches(default_collection))              # live document + value cache
+    asyncio.create_task(refresh_schema_cache(stream_collection=default_collection))  # field discovery
+    asyncio.create_task(index_all_examples_async())                       # RAG example embeddings
 
     yield
 
@@ -141,11 +116,12 @@ async def health_check():
 
     return JSONResponse(
         content={
-            "status":    "ok" if all_ok else "degraded",
-            "databases": db_status,
+            "status":       "ok" if all_ok else "degraded",
+            "databases":    db_status,
             "schema_cache": get_cache_status(),
+            "live_context": get_live_cache_status(),
             "rag_examples": get_example_count(),
-            "time":      time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "time":         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         },
         status_code=200 if all_ok else 503,
     )
@@ -176,6 +152,7 @@ async def llm_status():
         "model":        OLLAMA_MODEL,
         "available":    available,
         "schema_cache": get_cache_status(),
+        "live_context": get_live_cache_status(),
         "rag_examples": get_example_count(),
     })
 
@@ -452,19 +429,25 @@ async def clear_history():
 @app.post("/api/schema/refresh")
 async def refresh_schema():
     """
-    Manually triggers a live schema re-discovery from MongoDB.
+    Manually triggers a full refresh of all data caches:
+      - Live schema field discovery (field paths + types)
+      - Live data context (document samples + categorical values)
 
-    Useful after deploying database schema changes — call this
-    to force an immediate refresh without waiting for the TTL.
-
-    This is an admin/debug endpoint. In production you might
-    want to add authentication to it.
+    Useful after deploying database schema changes or after adding
+    significant new data to a collection. Call this to force an
+    immediate refresh without waiting for the TTL.
     """
     collection = os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2025")
-    await refresh_schema_cache(stream_collection=collection, force=True)
+
+    await asyncio.gather(
+        refresh_schema_cache(stream_collection=collection, force=True),
+        warm_all_caches(collection),
+    )
+
     return JSONResponse(content={
-        "success": True,
-        "cache":   get_cache_status(),
+        "success":      True,
+        "schema_cache": get_cache_status(),
+        "live_context": get_live_cache_status(),
     })
 
 
