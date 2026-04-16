@@ -656,11 +656,21 @@
 
 const PAGE_SIZE = 25;
 
+function randomUUID() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 const STORE_KEY  = "e3ds_chats";
 const MAX_CHATS  = 40;
 const MAX_ROWS   = 50;
 
-let SESSION_ID    = crypto.randomUUID();
+let SESSION_ID    = randomUUID();
 let currentTurns  = [];
 let activeAbort   = null;
 let _timedOut     = false;
@@ -791,7 +801,7 @@ document.querySelectorAll(".example-chip").forEach(btn => {
 
 // ── Start a new chat session ──────────────────────────────────
 function startNewChat() {
-  SESSION_ID   = crypto.randomUUID();
+  SESSION_ID   = randomUUID();
   currentTurns = [];
   messagesEl.innerHTML = "";
   messagesEl.style.display   = "none";
@@ -1602,7 +1612,7 @@ async function checkSharedChatUrl() {
     if (!json.success || !json.data) return;
     const shared = json.data;
 
-    SESSION_ID   = crypto.randomUUID();
+    SESSION_ID   = randomUUID();
     currentTurns = [];
 
     messagesEl.style.display   = "flex";

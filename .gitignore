@@ -5,37 +5,49 @@ __pycache__/
 *.pyo
 *.pyd
 *.so
+
+# Virtual environments
 .venv/
 venv/
 env/
 ENV/
-.env_local
 
+# Secrets
+.env
+.env.*
+.env_local
+!.env.example
+
+# Build artifacts
 build/
 dist/
 *.egg-info/
 *.egg
 .eggs/
-.env
-.env.*
-!.env.example
+
+# App data (auto-generated, not source)
 data/query_examples.json
-explore_db.py
-explore_db2.py
-/schemas.py
-/query_generator.py
-/query_executor.py
-/mongodb.py
-/index.html
+
+# Editor / IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# OS
 .DS_Store
+.AppleDouble
+.LSOverride
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
 *.log
 logs/
+
+# Testing / coverage
 .pytest_cache/
 .coverage
 htmlcov/
@@ -43,8 +55,3 @@ htmlcov/
 .ruff_cache/
 .ipynb_checkpoints/
 *.ipynb
-.DS_Store
-.AppleDouble
-.LSOverride
-Desktop.ini
-$RECYCLE.BIN/
