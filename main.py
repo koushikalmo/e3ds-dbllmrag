@@ -1,6 +1,5 @@
 # main.py — FastAPI app entry point
 # Routes: GET / | GET /api/health | GET /api/status | POST /api/query | POST /api/analyze
-# Startup: warm LLM → warm live data cache → discover schema fields → index RAG examples
 
 import os
 import time
@@ -8,7 +7,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-load_dotenv()  # must run before importing lib modules — they read env vars at import time
+load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse
@@ -25,6 +24,7 @@ from lib.schema_discovery   import refresh_schema_cache, get_cache_status
 from lib.live_data_context  import warm_all_caches, get_cache_status as get_live_cache_status
 from lib.query_examples     import get_example_count
 from lib.chat_history       import save_query, get_history, delete_entry, clear_all
+from lib.chat_sharing       import create_share, get_share
 from lib.query_examples     import index_all_examples_async
 from lib.session_memory     import add_turn, get_context_text, clear_session, active_session_count
 from lib.collection_resolver import resolve_and_log
@@ -32,7 +32,6 @@ from lib.collection_resolver import resolve_and_log
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── Startup ───────────────────────────────────────────────
     default_collection = os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2025")
 
     print("═" * 56)
@@ -44,16 +43,14 @@ async def lifespan(app: FastAPI):
     print(f"  RAG examples: {get_example_count()} in store")
     print("═" * 56)
 
-    # All four tasks run concurrently in the background.
-    # By the time the LLM finishes warming (60–90s), data caches are ready.
-    asyncio.create_task(warmup_model())                                   # load LLM into GPU
-    asyncio.create_task(warm_all_caches(default_collection))              # live document + value cache
-    asyncio.create_task(refresh_schema_cache(stream_collection=default_collection))  # field discovery
-    asyncio.create_task(index_all_examples_async())                       # RAG example embeddings
+    # All four startup tasks run concurrently in the background
+    asyncio.create_task(warmup_model())
+    asyncio.create_task(warm_all_caches(default_collection))
+    asyncio.create_task(refresh_schema_cache(stream_collection=default_collection))
+    asyncio.create_task(index_all_examples_async())
 
     yield
 
-    # ── Shutdown ──────────────────────────────────────────────
     await close_connections()
     print("[shutdown] MongoDB connections closed.")
 
@@ -79,22 +76,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 class QueryRequest(BaseModel):
     question:   str = Field(..., min_length=1, max_length=500)
-    collection: str = Field("Apr_2025")
-    session_id: str = Field("", description="Optional session ID for conversation context. Generate a UUID in the frontend and send it with every request in the same chat session. Omit (or send empty string) for stateless one-off queries.")
+    collection: str = Field("Apr_2026")
+    session_id: str = Field("", description="UUID from frontend — enables follow-up questions")
+
+
+class ShareRequest(BaseModel):
+    turns: list = Field(..., description="Chat turns to share")
+    title: str  = Field("", description="Human-readable title for the shared chat")
 
 
 class AnalyzeRequest(BaseModel):
-    """
-    Body for POST /api/analyze.
-
-    results:  The array of MongoDB documents to analyze.
-              Same 'results' array from a /api/query response.
-    question: The original question that produced these results.
-              Gives the LLM context for what to focus on.
-    """
     results:  list = Field(..., description="Query results from /api/query")
-    question: str  = Field(..., min_length=1, max_length=500,
-                           description="The question these results answer")
+    question: str  = Field(..., min_length=1, max_length=500)
 
 
 # ── Routes ─────────────────────────────────────────────────────
@@ -106,14 +99,8 @@ async def serve_frontend():
 
 @app.get("/api/health")
 async def health_check():
-    """
-    Pings both MongoDB databases.
-    Returns HTTP 200 if both are reachable, 503 if either is not.
-    Also reports schema discovery cache status.
-    """
     db_status = await ping_databases()
     all_ok    = all(v == "ok" for v in db_status.values())
-
     return JSONResponse(
         content={
             "status":       "ok" if all_ok else "degraded",
@@ -129,24 +116,8 @@ async def health_check():
 
 @app.get("/api/status")
 async def llm_status():
-    """
-    Returns information about the Ollama LLM provider:
-    whether it's running, which model is loaded, and RAG/schema stats.
-
-    Used by the frontend to show the LOCAL / OFFLINE indicator.
-
-    Response example:
-        {
-          "provider":  "ollama",
-          "model":     "qwen2.5-coder:7b",
-          "available": true,
-          "schema_cache": { "populated": true, "sampled_at": "..." },
-          "rag_examples": 42
-        }
-    """
     ollama    = OllamaProvider()
     available = await ollama.is_available()
-
     return JSONResponse(content={
         "provider":     "ollama",
         "model":        OLLAMA_MODEL,
@@ -159,70 +130,59 @@ async def llm_status():
 
 @app.post("/api/query")
 async def run_query(body: QueryRequest):
-    """
-    Main query endpoint. Converts a plain-English question into
-    a MongoDB aggregation pipeline and returns the results.
-
-    Flow:
-      1. generate_query()  → Ollama generates the pipeline
-                             (with RAG examples + live schema + retry loop)
-      2. execute_query()   → runs it safely against MongoDB
-      3. save_successful_query() → saves to RAG store for future use
-      4. Returns results as JSON
-
-    POST body:  { "question": "...", "collection": "Apr_2025" }
-
-    Success: { "success": true, "data": { results, summary, meta, ... } }
-    Error:   { "success": false, "error": "human-readable message" }
-    """
+    """NL question → MongoDB pipeline → results + AI summary."""
     start = time.perf_counter()
 
     try:
-        # Retrieve conversation context from this session (if any).
-        # Empty string for first query in a session or stateless mode.
         conversation_ctx = get_context_text(body.session_id)
-
-        # Auto-detect month/year from the question and resolve to
-        # the correct collection name (e.g. "October 2025" → "Oct_2025").
-        # Falls back to body.collection if no date is mentioned.
-        default_col = body.collection or os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2026")
-        collection  = resolve_and_log(body.question.strip(), default_col)
+        default_col      = body.collection or os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2026")
+        collection       = resolve_and_log(body.question.strip(), default_col)
 
         query_obj = await generate_query(
             question         = body.question.strip(),
             collection       = collection,
             conversation_ctx = conversation_ctx,
         )
+        result = await execute_query(query_obj)
 
-        result  = await execute_query(query_obj)
-
-        # ── Auto-analyze results with LLM ───────────────────────
-        # Run summarization immediately so the AI response is part
-        # of the query response — not a separate button click.
+        # Auto-analyze results immediately
         rows_for_analysis = result.get("results", [])
         if isinstance(rows_for_analysis, dict):
-            rows_for_analysis = (
-                rows_for_analysis.get("merged") or
-                rows_for_analysis.get("primary") or []
-            )
+            rows_for_analysis = rows_for_analysis.get("merged") or rows_for_analysis.get("primary") or []
 
         ai_summary = None
         if rows_for_analysis:
             try:
-                analysis   = await summarize_results(
-                    results  = rows_for_analysis,
-                    question = body.question.strip(),
-                )
+                analysis   = await summarize_results(results=rows_for_analysis, question=body.question.strip())
                 ai_summary = analysis.get("summary", "")
             except Exception as e:
                 print(f"[/api/query] Auto-analysis failed (non-fatal): {e}")
 
         elapsed = round(time.perf_counter() - start, 2)
 
-        # ── Auto-save to RAG example store ─────────────────────
-        # Save the successful query so future similar questions
-        # can use it as a few-shot example. We do this after
-        # getting the result so we know how many docs were returned.
+        # Build query plan summary for frontend PIPELINE tab
+        query_plan = None
+        qt = query_obj.get("queryType")
+        if qt == "single":
+            query_plan = {
+                "databases":   [query_obj.get("database", "")],
+                "collections": [query_obj.get("collection", "")],
+                "queryType":   "single",
+                "stageCount":  len(query_obj.get("pipeline", [])),
+            }
+        elif qt == "dual":
+            queries = query_obj.get("queries", [])
+            query_plan = {
+                "databases":   [q.get("database", "")  for q in queries],
+                "collections": [q.get("collection", "") for q in queries],
+                "queryType":   "dual",
+                "stageCount":  sum(len(q.get("pipeline", [])) for q in queries),
+                "dualQueries": [
+                    {"database": q.get("database", ""), "collection": q.get("collection", ""), "stageCount": len(q.get("pipeline", []))}
+                    for q in queries
+                ],
+            }
+
         result_count = 0
         if result.get("queryType") == "single":
             result_count = len(result.get("results", []))
@@ -232,24 +192,14 @@ async def run_query(body: QueryRequest):
                 result_count = len(primary.get("primary", []))
 
         if result_count > 0:
-            # Record this exchange in session memory so follow-up questions
-            # can refer to "that", "those results", "now filter by...", etc.
             if body.session_id:
-                answer_summary = (
-                    f"Returned {result_count} results — "
-                    f"'{query_obj.get('resultLabel', 'Results')}'"
+                add_turn(
+                    body.session_id,
+                    body.question.strip(),
+                    f"Returned {result_count} results — '{query_obj.get('resultLabel', 'Results')}'",
                 )
-                add_turn(body.session_id, body.question.strip(), answer_summary)
-
-            # Save to RAG example store (improves future query generation)
-            save_successful_query(
-                question     = body.question.strip(),
-                query_obj    = query_obj,
-                result_count = result_count,
-            )
-            # Save to MongoDB chat history in background — do NOT await this.
-            # Awaiting it blocks the HTTP response until the MongoDB write
-            # completes, which can hang the browser request for minutes.
+            save_successful_query(body.question.strip(), query_obj, result_count)
+            # Save to chat history in background — don't await (would block the response)
             asyncio.create_task(save_query(
                 question        = body.question.strip(),
                 collection      = collection,
@@ -263,7 +213,9 @@ async def run_query(body: QueryRequest):
             "success": True,
             "data": {
                 **result,
-                "aiSummary": ai_summary,
+                "aiSummary":   ai_summary,
+                "explanation": query_obj.get("explanation", ""),
+                "queryPlan":   query_plan,
                 "meta": {
                     "question":       body.question.strip(),
                     "collectionUsed": collection,
@@ -274,176 +226,69 @@ async def run_query(body: QueryRequest):
         })
 
     except TimeoutError as e:
-        return JSONResponse(
-            content={"success": False, "error": str(e)},
-            status_code=504,
-        )
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=504)
     except ValueError as e:
-        return JSONResponse(
-            content={"success": False, "error": str(e)},
-            status_code=400,
-        )
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=400)
     except Exception as e:
         import traceback
         print(f"[/api/query] Unhandled exception:\n{traceback.format_exc()}")
-        return JSONResponse(
-            content={"success": False, "error": f"Server error: {str(e)[:200]}"},
-            status_code=500,
-        )
+        return JSONResponse(content={"success": False, "error": f"Server error: {str(e)[:200]}"}, status_code=500)
 
 
 @app.post("/api/analyze")
 async def analyze_results(body: AnalyzeRequest):
-    """
-    AI-powered analysis of query results.
-
-    Accepts the results from a previous /api/query call and asks
-    Ollama to analyze / summarize them. Uses a chunked map-reduce
-    approach so it works correctly even when the result set exceeds
-    the LLM's context window.
-
-    HOW CHUNKING HANDLES LARGE RESULTS:
-    ─────────────────────────────────────
-    Small results (< 16K chars total) → single LLM call.
-    Large results → split into chunks of 25 docs.
-      Each chunk summarized separately, then all summaries
-      synthesized into a final answer. Works for any size.
-
-    POST body:
-      {
-        "results":  [ ...the results array from /api/query... ],
-        "question": "Which cities had the most sessions?"
-      }
-
-    Success:
-      {
-        "success": true,
-        "data": {
-          "summary":        "Brazil dominated with 45%...",
-          "method":         "chunked",
-          "chunksUsed":     6,
-          "docsAnalyzed":   150,
-          "elapsedSeconds": 8.3
-        }
-      }
-    """
+    """AI analysis of an existing result set. Uses chunked map-reduce for large sets."""
     start = time.perf_counter()
 
     if not body.results:
-        return JSONResponse(
-            content={"success": False, "error": "No results provided to analyze."},
-            status_code=400,
-        )
-
+        return JSONResponse(content={"success": False, "error": "No results provided."}, status_code=400)
     if not isinstance(body.results, list):
-        return JSONResponse(
-            content={"success": False, "error": "'results' must be a list of documents."},
-            status_code=400,
-        )
+        return JSONResponse(content={"success": False, "error": "'results' must be a list."}, status_code=400)
 
     try:
-        analysis = await summarize_results(
-            results  = body.results,
-            question = body.question.strip(),
-        )
-
-        elapsed = round(time.perf_counter() - start, 2)
-
-        return JSONResponse(content={
-            "success": True,
-            "data": {
-                **analysis,
-                "elapsedSeconds": elapsed,
-            },
-        })
-
+        analysis = await summarize_results(results=body.results, question=body.question.strip())
+        return JSONResponse(content={"success": True, "data": {**analysis, "elapsedSeconds": round(time.perf_counter() - start, 2)}})
     except Exception as e:
         import traceback
         print(f"[/api/analyze] Unhandled exception:\n{traceback.format_exc()}")
-        return JSONResponse(
-            content={"success": False, "error": f"Analysis failed: {str(e)[:200]}"},
-            status_code=500,
-        )
+        return JSONResponse(content={"success": False, "error": f"Analysis failed: {str(e)[:200]}"}, status_code=500)
 
 
 @app.get("/api/history")
 async def get_query_history(limit: int = 100):
-    """
-    Returns the user's query history from MongoDB, newest first.
-
-    Each entry contains the question, which collection was queried,
-    how many results came back, and when it ran.
-
-    Query param:
-        limit  — how many entries to return (default 100, max 500)
-
-    Response:
-        { "success": true, "history": [ { id, question, collection,
-          result_count, result_label, explanation, timestamp }, ... ] }
-    """
     try:
         entries = await get_history(limit=limit)
         return JSONResponse(content={"success": True, "history": entries})
     except Exception as e:
-        return JSONResponse(
-            content={"success": False, "error": str(e)},
-            status_code=500,
-        )
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 
 @app.delete("/api/history/{entry_id}")
 async def delete_history_entry(entry_id: str):
-    """
-    Deletes a single history entry by its MongoDB _id.
-
-    Path param:
-        entry_id — the hex string ObjectId of the history document
-    """
     try:
         deleted = await delete_entry(entry_id)
         return JSONResponse(content={"success": deleted})
     except Exception as e:
-        return JSONResponse(
-            content={"success": False, "error": str(e)},
-            status_code=500,
-        )
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 
 @app.delete("/api/history")
 async def clear_history():
-    """
-    Deletes all history entries from MongoDB.
-
-    Used by the "CLEAR" button in the history panel.
-    """
     try:
         count = await clear_all()
         return JSONResponse(content={"success": True, "deleted": count})
     except Exception as e:
-        return JSONResponse(
-            content={"success": False, "error": str(e)},
-            status_code=500,
-        )
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 
 @app.post("/api/schema/refresh")
 async def refresh_schema():
-    """
-    Manually triggers a full refresh of all data caches:
-      - Live schema field discovery (field paths + types)
-      - Live data context (document samples + categorical values)
-
-    Useful after deploying database schema changes or after adding
-    significant new data to a collection. Call this to force an
-    immediate refresh without waiting for the TTL.
-    """
-    collection = os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2025")
-
+    """Force-refresh all data caches (schema discovery + live context)."""
+    collection = os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2026")
     await asyncio.gather(
         refresh_schema_cache(stream_collection=collection, force=True),
         warm_all_caches(collection),
     )
-
     return JSONResponse(content={
         "success":      True,
         "schema_cache": get_cache_status(),
@@ -451,9 +296,36 @@ async def refresh_schema():
     })
 
 
+@app.post("/api/share")
+async def share_chat(body: ShareRequest):
+    """Save a chat snapshot and return a shareable ID."""
+    try:
+        share_id = await create_share(body.turns, body.title)
+        return JSONResponse(content={"success": True, "share_id": share_id})
+    except Exception as e:
+        import traceback
+        print(f"[/api/share] Error:\n{traceback.format_exc()}")
+        return JSONResponse(content={"success": False, "error": f"Failed to create share: {str(e)[:200]}"}, status_code=500)
+
+
+@app.get("/api/share/{share_id}")
+async def get_shared_chat(share_id: str):
+    try:
+        data = await get_share(share_id)
+        if not data:
+            return JSONResponse(content={"success": False, "error": "Shared chat not found."}, status_code=404)
+        return JSONResponse(content={"success": True, "data": data})
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/share/{share_id}", include_in_schema=False)
+async def serve_shared_chat_page(share_id: str):
+    return FileResponse("static/index.html")
+
+
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(
         "main:app",
         host        = os.getenv("HOST", "0.0.0.0"),

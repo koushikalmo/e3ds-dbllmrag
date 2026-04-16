@@ -1,7 +1,5 @@
-# lib/query_executor.py
-# Executes validated query objects against MongoDB.
+# lib/query_executor.py — Executes validated query objects against MongoDB
 # Handles four operation types: aggregate, countDocuments, find, distinct.
-# Also applies diacritic normalization and sanitizes problematic fields.
 
 import re
 import asyncio
@@ -10,25 +8,20 @@ from typing import Any
 from lib.db_registry import get_db, get_default_collection
 
 MAX_RESULTS   = 200
-QUERY_TIMEOUT = 15_000   # ms
+QUERY_TIMEOUT = 15_000  # ms
 
 _WRITE_STAGES = frozenset({"$out", "$merge"})
 
-# Fields that should use regex for matching so "Bogota" also finds "Bogotá"
+# These fields use regex matching so "Bogota" also finds "Bogotá"
 _PARTIAL_MATCH_FIELDS = frozenset({
-    "clientInfo.city",
-    "clientInfo.country_name",
-    "clientInfo.region",
-    "appInfo.appName",
-    "userDeviceInfo.os.name",
-    "userDeviceInfo.client.name",
+    "clientInfo.city", "clientInfo.country_name", "clientInfo.region",
+    "appInfo.appName", "userDeviceInfo.os.name", "userDeviceInfo.client.name",
     "elInfo.computerName",
 })
 
-# This field is rarely present in documents; filtering on it always returns 0
+# This field is rarely present — filtering on it returns 0 results
 _PROBLEMATIC_FIELDS = frozenset({"loggedInUserData"})
 
-# ASCII letter → diacritic character class for regex expansion
 _DIACRITIC_MAP: dict[str, str] = {
     "a": "aáàâäãåā", "e": "eéèêëē", "i": "iíìîïī",
     "o": "oóòôöõøō", "u": "uúùûüū", "n": "nñ",
@@ -36,14 +29,8 @@ _DIACRITIC_MAP: dict[str, str] = {
 }
 
 
-# ── Diacritic expansion ───────────────────────────────────────
-
 def _expand_diacritics(text: str) -> str:
-    """Convert a string to a regex that also matches accented variants.
-
-    "Bogota" → "b[oóòôöõøō]g[oóòôöõøō]t[aáàâäãåā]"
-    Used with $options:"i" for case insensitivity.
-    """
+    """"Bogota" → "b[oóòôöõøō]g[oóòôöõøō]t[aáàâäãåā]" for accent-insensitive matching."""
     parts = []
     for ch in text.lower():
         if ch in _DIACRITIC_MAP:
@@ -56,20 +43,14 @@ def _expand_diacritics(text: str) -> str:
 
 
 def _normalize_match_query(query: dict) -> dict:
-    """Normalize a MongoDB match filter for better accuracy.
-
-    1. Strip fields that are never present and cause zero results.
-    2. Convert plain string values on geographic/name fields to
-       diacritic-aware regex so "Bogota" matches "Bogotá".
-    3. Recurse into $and / $or / $nor.
-    """
+    """Strip problematic fields and convert plain string values to diacritic-aware regex."""
     if not isinstance(query, dict):
         return query
 
     result = {}
     for key, val in query.items():
         if key in _PROBLEMATIC_FIELDS:
-            continue  # silently strip — this field causes 0 results
+            continue
 
         if key in ("$and", "$or", "$nor") and isinstance(val, list):
             result[key] = [_normalize_match_query(v) for v in val]
@@ -81,7 +62,7 @@ def _normalize_match_query(query: dict) -> dict:
             elif isinstance(val, dict) and isinstance(val.get("$eq"), str):
                 result[key] = {"$regex": _expand_diacritics(val["$eq"]), "$options": "i"}
             else:
-                result[key] = val  # already a regex / $in / etc — leave it
+                result[key] = val
         else:
             result[key] = val
 
@@ -89,17 +70,11 @@ def _normalize_match_query(query: dict) -> dict:
 
 
 def _normalize_pipeline(pipeline: list) -> list:
-    """Apply _normalize_match_query to every $match stage in a pipeline."""
-    return [
-        {"$match": _normalize_match_query(s["$match"])} if "$match" in s else s
-        for s in pipeline
-    ]
+    return [{"$match": _normalize_match_query(s["$match"])} if "$match" in s else s for s in pipeline]
 
-
-# ── Pipeline safety ───────────────────────────────────────────
 
 def _sanitize_pipeline(pipeline: list) -> list:
-    """Remove $out and $merge — keep the tool read-only."""
+    """Remove $out and $merge — keep queries read-only."""
     clean = []
     for stage in pipeline:
         op = next(iter(stage), None)
@@ -115,17 +90,12 @@ def _enforce_limit(pipeline: list) -> list:
     has_limit = any("$limit" in s for s in pipeline)
     if not has_limit:
         return pipeline + [{"$limit": MAX_RESULTS}]
-    return [
-        {"$limit": min(s["$limit"], MAX_RESULTS)} if "$limit" in s else s
-        for s in pipeline
-    ]
+    return [{"$limit": min(s["$limit"], MAX_RESULTS)} if "$limit" in s else s for s in pipeline]
 
 
 def _prepare_pipeline(pipeline: list) -> list:
     return _enforce_limit(_sanitize_pipeline(pipeline))
 
-
-# ── Database routing ──────────────────────────────────────────
 
 def _get_db(database: str):
     try:
@@ -141,22 +111,20 @@ def _resolve_collection(database: str, collection: str) -> str:
     if default:
         return default
     raise ValueError(
-        f"No collection specified for '{database}' and no default is configured. "
+        f"No collection specified for '{database}' and no default configured. "
         "For appConfigs, provide the owner's username as the collection name."
     )
 
-
-# ── BSON serialization ────────────────────────────────────────
 
 def _make_serializable(docs: list[dict]) -> list[dict]:
     """Convert ObjectId and Decimal128 to JSON-safe Python types."""
     import bson
 
     def convert(val: Any) -> Any:
-        if isinstance(val, bson.ObjectId):    return str(val)
-        if isinstance(val, bson.Decimal128):  return float(str(val))
-        if isinstance(val, dict):             return {k: convert(v) for k, v in val.items()}
-        if isinstance(val, list):             return [convert(i) for i in val]
+        if isinstance(val, bson.ObjectId):   return str(val)
+        if isinstance(val, bson.Decimal128): return float(str(val))
+        if isinstance(val, dict):            return {k: convert(v) for k, v in val.items()}
+        if isinstance(val, list):            return [convert(i) for i in val]
         return val
 
     return [convert(doc) for doc in docs]
@@ -166,14 +134,10 @@ def _summarize(results: list[dict]) -> dict:
     return {"count": len(results), "sample": results[:5]}
 
 
-# ── Query runners ─────────────────────────────────────────────
-
 async def _run_aggregate(database: str, collection: str, raw_pipeline: list) -> list[dict]:
-    """Run an aggregation pipeline with diacritic normalization and safety guards."""
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
     pipeline  = _prepare_pipeline(_normalize_pipeline(raw_pipeline))
-
     print(f"[executor] aggregate {database}/{coll_name} ({len(pipeline)} stages)")
     try:
         cursor  = db[coll_name].aggregate(pipeline, allowDiskUse=True, maxTimeMS=QUERY_TIMEOUT)
@@ -184,15 +148,10 @@ async def _run_aggregate(database: str, collection: str, raw_pipeline: list) -> 
 
 
 async def _run_count_documents(database: str, collection: str, query: dict) -> list[dict]:
-    """Exact count via count_documents() — no pipeline, no $limit interference.
-
-    This is the only correct way to count. Using aggregate+$count lets the LLM
-    accidentally place $limit before $count and get a wrong (smaller) number.
-    """
+    """Use count_documents() instead of aggregate+$count to avoid $limit interference."""
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
     clean     = _normalize_match_query(query or {})
-
     print(f"[executor] countDocuments {database}/{coll_name}")
     try:
         count = await db[coll_name].count_documents(clean, maxTimeMS=QUERY_TIMEOUT)
@@ -202,19 +161,13 @@ async def _run_count_documents(database: str, collection: str, query: dict) -> l
 
 
 async def _run_find(
-    database:   str,
-    collection: str,
-    query:      dict,
-    projection: dict | None = None,
-    sort:       dict | None = None,
-    limit:      int = 50,
+    database: str, collection: str, query: dict,
+    projection: dict | None = None, sort: dict | None = None, limit: int = 50,
 ) -> list[dict]:
-    """Cursor-based find with optional projection and sort."""
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
     clean     = _normalize_match_query(query or {})
     limit     = min(limit or 50, MAX_RESULTS)
-
     print(f"[executor] find {database}/{coll_name} (limit={limit})")
     try:
         cursor = db[coll_name].find(clean, projection or {})
@@ -228,16 +181,12 @@ async def _run_find(
 
 
 async def _run_distinct(
-    database:   str,
-    collection: str,
-    field:      str,
-    query:      dict | None = None,
+    database: str, collection: str, field: str, query: dict | None = None,
 ) -> list[dict]:
-    """Distinct field values returned as [{"value": v}, ...] for consistent rendering."""
+    """Returns distinct values as [{"value": v}, ...] for consistent rendering."""
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
     clean     = _normalize_match_query(query or {})
-
     print(f"[executor] distinct '{field}' {database}/{coll_name}")
     try:
         values = await db[coll_name].distinct(field, clean)
@@ -252,12 +201,12 @@ def _raise_friendly(err: Exception, database: str, coll_name: str):
     if "MaxTimeMSExpired" in s or "exceeded time limit" in s.lower():
         raise TimeoutError(
             f"Query exceeded {QUERY_TIMEOUT // 1000}s. "
-            "Add a more specific filter (owner name, date range, country) to reduce data scanned."
+            "Add a more specific filter (owner, date range, country) to reduce data scanned."
         )
     if "NamespaceNotFound" in s:
         if database == "stream-datastore":
             raise ValueError(
-                f"Collection '{coll_name}' doesn't exist in stream-datastore. "
+                f"Collection '{coll_name}' doesn't exist. "
                 "Monthly collections use format 'Apr_2025'. It may not have data yet."
             )
         raise ValueError(
@@ -265,20 +214,16 @@ def _raise_friendly(err: Exception, database: str, coll_name: str):
             "Check that the owner username is spelled correctly."
         )
     if "BSONObjectTooLarge" in s:
-        raise ValueError("Result document exceeded 16MB. Add a $project to return fewer fields.")
+        raise ValueError("Result exceeded 16MB. Add a $project to return fewer fields.")
     raise err
 
 
-# Keep the old name in case any internal callers use it
-_run_single = _run_aggregate
+_run_single = _run_aggregate  # backward-compat alias
 
-
-# ── Main entry point ──────────────────────────────────────────
 
 async def execute_query(query_obj: dict) -> dict:
     """Execute a validated query object. Dispatches by queryType and operation."""
 
-    # ── Single query ──────────────────────────────────────────
     if query_obj["queryType"] == "single":
         operation = query_obj.get("operation", "aggregate")
         db        = query_obj["database"]
@@ -286,7 +231,6 @@ async def execute_query(query_obj: dict) -> dict:
 
         if operation == "countDocuments":
             results = await _run_count_documents(db, coll, query_obj.get("query", {}))
-
         elif operation == "find":
             results = await _run_find(
                 db, coll,
@@ -295,14 +239,9 @@ async def execute_query(query_obj: dict) -> dict:
                 sort       = query_obj.get("sort"),
                 limit      = query_obj.get("limit", 50),
             )
-
         elif operation == "distinct":
-            results = await _run_distinct(db, coll,
-                field = query_obj.get("field", ""),
-                query = query_obj.get("query", {}),
-            )
-
-        else:  # aggregate (default)
+            results = await _run_distinct(db, coll, query_obj.get("field", ""), query_obj.get("query", {}))
+        else:
             results = await _run_aggregate(db, coll, query_obj["pipeline"])
 
         print(f"[executor] {operation} → {len(results)} result(s)")
@@ -316,10 +255,8 @@ async def execute_query(query_obj: dict) -> dict:
             "executedPipeline": query_obj.get("pipeline", []),
         }
 
-    # ── Dual query ─────────────────────────────────────────────
     if query_obj["queryType"] == "dual":
         q1, q2 = query_obj["queries"]
-
         print("[executor] Running dual query in parallel…")
         results1, results2 = await asyncio.gather(
             _run_aggregate(q1["database"], q1.get("collection", ""), q1["pipeline"]),
@@ -327,21 +264,13 @@ async def execute_query(query_obj: dict) -> dict:
         )
         print(f"[executor] Dual: primary={len(results1)}, secondary={len(results2)}")
 
-        # In-memory join by owner key if mergeKey is specified
+        # In-memory join by mergeKey if provided
         merged = None
         if merge_key := query_obj.get("mergeKey"):
-            # Build lookup from secondary (appConfigs) results
-            config_map = {
-                str(doc.get(merge_key) or doc.get("_id", "")): doc
-                for doc in results2
-            }
+            config_map = {str(doc.get(merge_key) or doc.get("_id", "")): doc for doc in results2}
             merged = []
             for doc in results1:
-                owner = str(
-                    doc.get(merge_key)
-                    or doc.get("appInfo", {}).get("owner", "")
-                    or ""
-                )
+                owner    = str(doc.get(merge_key) or doc.get("appInfo", {}).get("owner", "") or "")
                 enriched = dict(doc)
                 if owner and owner in config_map:
                     enriched["_configData"] = config_map[owner]

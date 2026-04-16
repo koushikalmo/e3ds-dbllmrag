@@ -1,28 +1,5 @@
-# ============================================================
-# lib/schemas.py — Structural Rules for the LLM
-# ============================================================
-# This file contains ONLY structural rules and critical gotchas
-# that the LLM needs for every query. It is intentionally small
-# (~750 tokens) so the context window is not wasted.
-#
-# WHAT IS NOT HERE:
-#   Field listings and descriptions are gone. Those now live in
-#   the vector store (data/vectors/schema.json) and are retrieved
-#   semantically per-query by lib/schema_discovery.py +
-#   lib/vector_store.py. Only the 15-20 fields most relevant to
-#   each question are injected — instead of all 200+.
-#
-# WHY THIS SPLIT:
-#   Old approach: dump 4,500 tokens of schema on every query.
-#   New approach: 750 tokens of rules + ~400 tokens of relevant
-#   fields retrieved by semantic search = ~1,150 tokens.
-#   This fits comfortably in 8192 num_ctx with room for output.
-# ============================================================
-
-
-# ── Structural rules ──────────────────────────────────────────
-# These are included in every LLM call, regardless of which
-# database the question targets.
+# lib/schemas.py — LLM system prompt: structural rules + field gotchas
+# Intentionally small (~750 tokens). Field details come from vector RAG per query.
 
 _CORE_RULES = """You are a MongoDB query expert for the Eagle 3D Streaming platform.
 Convert the user's natural language question into a valid MongoDB query.
@@ -67,7 +44,7 @@ OPERATION TYPES — CHOOSE THE RIGHT ONE
   {
     "queryType": "single", "database": "stream-datastore",
     "collection": "Oct_2025", "operation": "countDocuments",
-    "query": { "clientInfo.country_name": "India", "e3ds_employee": false },
+    "query": { "clientInfo.country_name": "India", "e3ds_employee": { "$ne": true } },
     "explanation": "Counts sessions from India in October 2025",
     "resultLabel": "Sessions from India"
   }
@@ -79,7 +56,7 @@ OPERATION TYPES — CHOOSE THE RIGHT ONE
   {
     "queryType": "single", "database": "stream-datastore",
     "collection": "Apr_2025", "operation": "find",
-    "query": { "appInfo.owner": "eduardo", "e3ds_employee": false },
+    "query": { "appInfo.owner": "eduardo", "e3ds_employee": { "$ne": true } },
     "sort": { "startTimeStamp": -1 }, "limit": 20,
     "explanation": "Lists recent sessions for eduardo",
     "resultLabel": "Eduardo's Sessions"
@@ -93,7 +70,7 @@ OPERATION TYPES — CHOOSE THE RIGHT ONE
     "queryType": "single", "database": "stream-datastore",
     "collection": "Apr_2025", "operation": "distinct",
     "field": "clientInfo.country_name",
-    "query": { "e3ds_employee": false },
+    "query": { "e3ds_employee": { "$ne": true } },
     "explanation": "Lists all distinct countries with sessions",
     "resultLabel": "Countries with Sessions"
   }
@@ -106,7 +83,7 @@ OPERATION TYPES — CHOOSE THE RIGHT ONE
     "queryType": "single", "database": "stream-datastore",
     "collection": "Apr_2025", "operation": "aggregate",
     "pipeline": [
-      { "$match": { "e3ds_employee": false } },
+      { "$match": { "e3ds_employee": { "$ne": true } } },
       { "$group": { "_id": "$clientInfo.country_name", "sessions": { "$sum": 1 } } },
       { "$sort": { "sessions": -1 } },
       { "$limit": 10 }
@@ -131,9 +108,11 @@ AGGREGATE $LIMIT RULES:
 STREAM-DATASTORE RULES
 ═══════════════════════════════════════════════
 - Collections are named by month: "Apr_2026", "Mar_2026", "Feb_2026", etc.
-- ALWAYS filter internal traffic first: { "e3ds_employee": false }
-  For aggregate: first stage must be { "$match": { "e3ds_employee": false } }
-  For countDocuments/find/distinct: include in "query": { "e3ds_employee": false }
+- ALWAYS filter internal traffic first: { "e3ds_employee": { "$ne": true } }
+  This uses $ne:true (not equals true) instead of false, so it correctly includes
+  documents where e3ds_employee is absent, null, or false — all are real user sessions.
+  For aggregate: first stage must be { "$match": { "e3ds_employee": { "$ne": true } } }
+  For countDocuments/find/distinct: include in "query": { "e3ds_employee": { "$ne": true } }
 
 - ALL *_Timestamp fields are FLOATS (Unix seconds).
   Session duration: { "$subtract": ["$DisconnectTime_Timestamp", "$startTimeStamp"] } → seconds
@@ -208,7 +187,7 @@ Example dual query structure:
   "queryType": "dual",
   "queries": [
     { "database": "stream-datastore", "collection": "Apr_2025", "pipeline": [
-        { "$match": { "e3ds_employee": false } },
+        { "$match": { "e3ds_employee": { "$ne": true } } },
         { "$group": { "_id": "$appInfo.owner", "sessions": { "$sum": 1 } } }
     ]},
     { "database": "appConfigs", "collection": "eduardo", "pipeline": [
@@ -221,10 +200,7 @@ Example dual query structure:
 }
 """
 
-
-# ── Structural schema blocks ──────────────────────────────────
-# Very short summaries of each DB. Field details come from RAG.
-
+# Short DB structure summaries — field details come from vector RAG
 _STREAM_STRUCTURE = """
 DATABASE: stream-datastore
 One document = one user streaming session.
@@ -245,28 +221,12 @@ def build_system_prompt(
     include_appconfigs: bool = False,
     schema_context:     str  = "",
 ) -> str:
-    """
-    Assembles the LLM system prompt for this query.
-
-    Args:
-        include_stream:     Include the stream-datastore structure note.
-        include_appconfigs: Include the appConfigs structure note.
-        schema_context:     Retrieved-from-RAG field descriptions.
-                            Pass the output of retrieve_schema_context()
-                            from schema_discovery.py. If empty, the model
-                            works from its general MongoDB knowledge and
-                            whatever examples are in the user message.
-
-    Returns:
-        Complete system prompt string, ready for Ollama.
-    """
+    """Assemble the full LLM system prompt for this query."""
     parts = [_CORE_RULES]
-
     if include_stream:
         parts.append(_STREAM_STRUCTURE)
     if include_appconfigs:
         parts.append(_APPCONFIGS_STRUCTURE)
-
     if schema_context:
         parts.append(
             "═══════════════════════════════════════════════\n"
@@ -274,15 +234,10 @@ def build_system_prompt(
             "═══════════════════════════════════════════════\n"
             + schema_context
         )
-
     return "\n".join(parts)
 
 
-# ── Keyword sets for database routing ─────────────────────────
-# query_generator.py scans the question for these keywords to
-# decide which database(s) to target. Add here if questions
-# are being routed to the wrong database.
-
+# Keyword sets for database routing — add here if questions route to the wrong DB
 STREAM_KEYWORDS = {
     "session", "stream", "connected", "connection", "disconnect", "spectator",
     "heartbeat", "reconnect", "streaming",

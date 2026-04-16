@@ -9,7 +9,8 @@ Method 1: Global installation:
   source venv/bin/activate   (Linux/Mac)
   venv\Scripts\activate      (Windows)
   pip install -r requirements.txt
-  '''
+  
+'''
 
 fastapi==0.115.5
 uvicorn[standard]==0.32.1

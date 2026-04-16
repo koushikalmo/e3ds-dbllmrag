@@ -50,14 +50,14 @@
     header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 1.25rem 0 1rem; border-bottom: 1px solid var(--border);
-      background: var(--bg); gap: 1rem; height: 52px; flex-shrink: 0;
+      background: var(--bg); gap: .75rem; height: 52px; flex-shrink: 0;
       box-shadow: 0 1px 3px rgba(0,0,0,.06);
     }
-    .logo { display: flex; align-items: center; gap: .75rem; }
+    .logo { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; }
     .logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 7px rgba(217,95,0,.35); }
     .logo-text { font-family: var(--display); font-size: 1rem; font-weight: 800; letter-spacing: -.02em; }
     .logo-text span { color: var(--accent); }
-    .header-right { display: flex; align-items: center; gap: 1.25rem; }
+    .header-right { display: flex; align-items: center; gap: .75rem; }
     .llm-badge {
       display: flex; align-items: center; gap: 5px;
       font-size: 10px; padding: 3px 8px; border-radius: 4px;
@@ -67,17 +67,43 @@
     .llm-badge.cloud  { color: #1d4ed8; border-color: #93c5fd; background: #eff6ff; }
     .llm-badge.error  { color: var(--red); border-color: #fca5a5; background: #fef2f2; }
     .llm-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
-    .status { display: flex; align-items: center; gap: 5px; color: var(--dim); font-size: 10px; }
+    .status { display: flex; align-items: center; gap: 5px; color: var(--dim); font-size: 10px; white-space: nowrap; }
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
 
+    /* Share button in header */
+    .btn-header-share {
+      display: flex; align-items: center; gap: 5px;
+      background: none; border: 1px solid var(--border2); color: var(--dim);
+      padding: 4px 10px; border-radius: 5px; font-family: var(--mono);
+      font-size: 10px; cursor: pointer; letter-spacing: .06em;
+      transition: all .15s; white-space: nowrap;
+    }
+    .btn-header-share:hover { border-color: var(--accent); color: var(--accent); background: #fff7ed; }
+
+    /* Hamburger (mobile only) */
+    .hamburger {
+      display: none; background: none; border: none; cursor: pointer;
+      padding: 5px; color: var(--dim); border-radius: 5px; transition: background .15s;
+      flex-shrink: 0;
+    }
+    .hamburger:hover { background: var(--bg2); }
+
     /* ── Workspace ───────────────────────────────────────────── */
-    .workspace { display: flex; flex: 1; overflow: hidden; }
+    .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+    /* Sidebar overlay (mobile) */
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.35); z-index: 99;
+    }
+    .sidebar-overlay.open { display: block; }
 
     /* ── Sidebar ─────────────────────────────────────────────── */
     .sidebar {
       width: var(--sidebar); flex-shrink: 0;
       background: var(--bg2); border-right: 1px solid var(--border);
       display: flex; flex-direction: column; overflow: hidden;
+      transition: transform .25s ease;
     }
     .sidebar-top {
       padding: .75rem .75rem .5rem; flex-shrink: 0;
@@ -125,7 +151,20 @@
     }
 
     /* ── Chat area ───────────────────────────────────────────── */
-    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+    .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); min-width: 0; }
+
+    /* Share banner */
+    .share-banner {
+      background: #fff7ed; border-bottom: 1px solid #fed7aa;
+      padding: .5rem 1.25rem; font-size: 11px; color: var(--yellow);
+      display: none; align-items: center; gap: .75rem; flex-shrink: 0;
+    }
+    .share-banner strong { color: var(--accent); }
+    .share-banner-close {
+      margin-left: auto; background: none; border: none;
+      color: var(--dimmer); cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1;
+    }
+    .share-banner-close:hover { color: var(--text); }
 
     /* ── Messages scroll container ───────────────────────────── */
     .messages-wrap { flex: 1; overflow-y: auto; }
@@ -239,11 +278,13 @@
     .result-label { color: var(--accent); font-weight: 700; font-size: 11px; }
     .result-meta  { color: var(--dimmer); font-size: 11px; }
     .result-card-header-right { display: flex; align-items: center; gap: .5rem; }
-    .view-tabs { display: flex; gap: 3px; }
+    .view-tabs { display: flex; gap: 3px; overflow-x: auto; flex-wrap: nowrap; max-width: 100%; }
+    .view-tabs::-webkit-scrollbar { height: 0; }
     .tab-btn {
       background: none; border: 1px solid var(--border); color: var(--dimmer);
       padding: 2px 8px; border-radius: 4px; font-family: var(--mono); font-size: 10px;
       cursor: pointer; letter-spacing: .04em; text-transform: uppercase; transition: all .15s;
+      white-space: nowrap; flex-shrink: 0;
     }
     .tab-btn.active { background: var(--bg); color: var(--text); border-color: var(--border2); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .tab-btn:hover:not(.active) { color: var(--dim); background: var(--bg3); }
@@ -293,6 +334,64 @@
       font-family: var(--mono); overflow: auto; white-space: pre; min-height: 100px;
     }
     .pipeline-view { color: #89b4fa; }
+
+    /* ── PLAN view ───────────────────────────────────────────── */
+    .plan-view {
+      padding: 1.1rem 1.25rem; font-size: 12px; line-height: 1.75;
+      color: var(--text); overflow-y: auto; max-height: 380px;
+    }
+    .plan-section { margin-bottom: 1.1rem; }
+    .plan-section:last-child { margin-bottom: 0; }
+    .plan-section-title {
+      font-size: 9px; letter-spacing: .12em; color: var(--accent);
+      font-weight: 700; margin-bottom: .5rem; text-transform: uppercase;
+    }
+    .plan-db-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 3px 10px; font-size: 11px;
+      color: var(--text); margin: 2px 2px 2px 0;
+    }
+    .chip-db  { color: var(--blue); font-weight: 600; }
+    .chip-arr { color: var(--dimmer); }
+    .chip-col { color: var(--dim); }
+    .plan-explanation {
+      font-size: 12px; color: var(--text); line-height: 1.75;
+      background: var(--bg2); border-radius: 6px; padding: .75rem 1rem;
+      border-left: 3px solid var(--accent);
+    }
+
+    /* ── STEPS view ──────────────────────────────────────────── */
+    .steps-view {
+      padding: 1.1rem 1.25rem; overflow-y: auto; max-height: 380px;
+    }
+    .step-row {
+      display: flex; gap: .75rem; align-items: flex-start; margin-bottom: .6rem;
+    }
+    .step-row:last-child { margin-bottom: 0; }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      background: var(--bg3); border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; color: var(--dim); margin-top: 1px;
+    }
+    .step-text { font-size: 12px; color: var(--text); line-height: 1.7; }
+
+    /* ── DATA view ───────────────────────────────────────────── */
+    .data-view { display: flex; flex-direction: column; overflow-y: auto; max-height: 380px; }
+    .data-section { border-bottom: 1px solid var(--border); }
+    .data-section:last-child { border-bottom: none; }
+    .data-section-label {
+      padding: .35rem .875rem; background: var(--bg2); font-size: 9px;
+      letter-spacing: .12em; color: var(--dim); font-weight: 700;
+      text-transform: uppercase; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 1;
+    }
+    .data-section-body { overflow: auto; max-height: 160px; }
+    .data-analysis-body {
+      padding: .875rem 1rem; font-size: 12px; line-height: 1.75; color: var(--text);
+    }
+    .data-analysis-body .ai-summary { padding: 0; font-size: 12px; }
 
     /* ── Input dock (fixed at bottom) ────────────────────────── */
     .input-dock {
@@ -345,10 +444,88 @@
     .btn-stop-inline:hover { background: #991b1b; color: #fff; }
     .input-footer {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 .25rem; max-width: 860px;
+      padding: 0 .25rem;
     }
     .input-footer-hint { color: var(--dimmer); font-size: 10px; }
     .listening-hint { color: var(--accent); font-size: 11px; animation: pulse 1s infinite; }
+
+    /* ── Share modal ─────────────────────────────────────────── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 200;
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 12px; padding: 1.5rem; width: min(500px, 100%);
+      box-shadow: 0 8px 40px rgba(0,0,0,.15);
+    }
+    .modal-title {
+      font-family: var(--display); font-size: 1.05rem; font-weight: 800;
+      margin-bottom: .25rem; color: var(--text);
+    }
+    .modal-sub { color: var(--dim); font-size: 11px; margin-bottom: 1.1rem; line-height: 1.6; }
+    .modal-link-row { display: flex; gap: .5rem; margin-bottom: .6rem; }
+    .modal-link-input {
+      flex: 1; background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 6px; padding: .5rem .75rem; font-family: var(--mono);
+      font-size: 11px; color: var(--text); outline: none; min-width: 0;
+    }
+    .modal-link-input:focus { border-color: var(--accent); }
+    .modal-copy-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 6px;
+      padding: .5rem 1rem; font-family: var(--mono); font-size: 11px; font-weight: 700;
+      cursor: pointer; letter-spacing: .04em; transition: background .15s; white-space: nowrap;
+    }
+    .modal-copy-btn:hover:not(:disabled) { background: #bf5200; }
+    .modal-copy-btn:disabled { background: var(--border2); color: var(--dim); cursor: default; }
+    .modal-info { color: var(--dimmer); font-size: 10px; margin-bottom: 1rem; line-height: 1.5; }
+    .modal-close-btn {
+      width: 100%; background: none; border: 1px solid var(--border2); border-radius: 6px;
+      padding: .5rem; font-family: var(--mono); font-size: 11px; color: var(--dim);
+      cursor: pointer; transition: all .15s;
+    }
+    .modal-close-btn:hover { border-color: var(--border2); color: var(--text); background: var(--bg2); }
+
+    /* ── Mobile responsive ───────────────────────────────────── */
+    @media (max-width: 768px) {
+      .hamburger { display: flex; }
+      .status { display: none; }
+
+      .sidebar {
+        position: fixed; left: 0; top: 0; bottom: 0; height: 100%;
+        z-index: 100; transform: translateX(-100%); width: 280px !important;
+      }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,.15); }
+
+      header { padding: 0 .875rem; gap: .5rem; height: 50px; }
+      .logo-text { font-size: .85rem; }
+      .llm-badge { font-size: 9px; padding: 3px 6px; }
+      .btn-header-share { font-size: 9px; padding: 3px 7px; }
+
+      .messages { padding: 1rem .75rem .75rem; gap: 1.25rem; }
+      .input-dock { padding: .625rem .75rem .875rem; }
+
+      .result-card-header { flex-direction: column; align-items: flex-start; gap: .4rem; }
+      .result-card-header-right { width: 100%; }
+      .view-tabs { width: 100%; }
+
+      .msg-user-bubble { max-width: 88%; font-size: 12px; }
+      .msg-user-avatar { display: none; }
+
+      .welcome-state { padding: 2rem 1rem; }
+      .welcome-glyph { font-size: 2.5rem; }
+      .welcome-sub { font-size: 11px; }
+      .example-chips { gap: .375rem; }
+      .example-chip { font-size: 10px; padding: .375rem .625rem; }
+
+      textarea { font-size: 12px; padding: .75rem .875rem; }
+    }
+
+    @media (max-width: 420px) {
+      .logo-text { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -361,19 +538,33 @@
       <div class="logo-text">EAGLE 3DS <span>QUERY</span></div>
     </div>
     <div class="header-right">
+      <button class="btn-header-share" id="shareBtn" style="display:none" title="Share this chat">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        SHARE
+      </button>
       <div class="llm-badge" id="llmBadge" title="Active LLM provider">
         <span class="llm-badge-dot"></span>
         <span id="llmBadgeText">LLM</span>
       </div>
       <div class="status"><div class="status-dot"></div>LIVE</div>
+      <button class="hamburger" id="hamburger" title="Menu" aria-label="Open menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
     </div>
   </header>
 
   <!-- ── WORKSPACE ──────────────────────────────────────────── -->
   <div class="workspace">
 
+    <!-- Sidebar overlay (mobile tap-to-close) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
     <!-- ── SIDEBAR ────────────────────────────────────────────── -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-top">
         <button class="new-chat-btn" id="newChatBtn">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -387,13 +578,17 @@
       </div>
     </aside>
 
-    <!-- ── CHAT AREA ────────────────────────────────────────────── -->
+    <!-- ── CHAT AREA ──────────────────────────────────────────── -->
     <div class="chat-area">
+
+      <!-- Share banner (shown when viewing a shared chat) -->
+      <div class="share-banner" id="shareBanner">
+        Viewing shared chat &mdash; <strong id="shareBannerTitle"></strong>
+        <button class="share-banner-close" id="shareBannerClose" title="Dismiss">×</button>
+      </div>
 
       <!-- Messages scroll area -->
       <div class="messages-wrap" id="messagesWrap">
-
-        <!-- Welcome state (shown when no messages) -->
         <div class="welcome-state" id="welcomeState">
           <div class="welcome-glyph">E3DS</div>
           <div class="welcome-sub">
@@ -407,10 +602,7 @@
             <button class="example-chip">Which apps had the most sessions last month?</button>
           </div>
         </div>
-
-        <!-- Message turns render here -->
         <div class="messages" id="messages" style="display:none;"></div>
-
       </div>
 
       <!-- Input dock -->
@@ -423,75 +615,88 @@
               <button class="btn-icon btn-voice" id="voiceBtn" title="Voice input">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
               </button>
-              <button class="btn-icon btn-stop-inline" id="stopBtn" style="display:none;" title="Stop">
-                ■
-              </button>
+              <button class="btn-icon btn-stop-inline" id="stopBtn" style="display:none;" title="Stop">&#9632;</button>
               <button class="btn-icon btn-send" id="runBtn" title="Send (Enter)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
               </button>
             </div>
           </div>
           <div class="input-footer">
-            <span class="listening-hint" id="listeningHint" style="display:none;">● Listening…</span>
+            <span class="listening-hint" id="listeningHint" style="display:none;">&#9679; Listening&hellip;</span>
             <span></span>
-            <span class="input-footer-hint">Enter to send · Shift+Enter for newline</span>
+            <span class="input-footer-hint">Enter to send &middot; Shift+Enter for newline</span>
           </div>
         </div>
       </div>
+
     </div><!-- end .chat-area -->
 
   </div><!-- end .workspace -->
+
+  <!-- ── SHARE MODAL ────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="shareModal">
+    <div class="modal">
+      <div class="modal-title">Share this chat</div>
+      <div class="modal-sub">Anyone with the link can view this conversation and ask their own follow-up questions.</div>
+      <div class="modal-link-row">
+        <input class="modal-link-input" id="shareLink" readonly placeholder="Generating link…" />
+        <button class="modal-copy-btn" id="shareCopyBtn" disabled>COPY</button>
+      </div>
+      <div class="modal-info" id="shareStatus">Saving conversation to database…</div>
+      <button class="modal-close-btn" id="shareCloseBtn">Close</button>
+    </div>
+  </div>
+
 </div><!-- end #app -->
 
 <script>
 // ============================================================
-// Eagle 3DS Query UI — v4  (ChatGPT-style conversation)
-// ============================================================
-// Layout: sidebar (past chats) + scrolling message thread + fixed input
-// History: stored in localStorage — clicking a session loads it,
-//          does NOT re-run queries.
-// Per-message: each result card has its own tab/page state.
+// Eagle 3DS Query UI — v5
 // ============================================================
 
 const PAGE_SIZE = 25;
 
-// ── Session & conversation state ──────────────────────────────
-// A "session" = one continuous conversation (a series of turns).
-// A "turn"    = one user question + one assistant response.
-//
-// Conversation data lives in localStorage under key "e3ds_chats".
-// Each entry: { id, title, createdAt, turns: [{role, content|data|error, ts}] }
-
 const STORE_KEY  = "e3ds_chats";
-const MAX_CHATS  = 40;      // max sessions to keep in localStorage
-const MAX_ROWS   = 50;      // max result rows stored per turn (localStorage size)
+const MAX_CHATS  = 40;
+const MAX_ROWS   = 50;
 
-let SESSION_ID    = crypto.randomUUID();   // current conversation ID
-let currentTurns  = [];                    // turns for the active session
+let SESSION_ID    = crypto.randomUUID();
+let currentTurns  = [];
 let activeAbort   = null;
 let _timedOut     = false;
 let isListening   = false;
 let recognition   = null;
 
-// Per-message render state: WeakMap<element, {rows, page, view, data}>
 const msgState = new WeakMap();
 
 
 // ── DOM refs ──────────────────────────────────────────────────
-const questionInput  = document.getElementById("questionInput");
-const runBtn         = document.getElementById("runBtn");
-const stopBtn        = document.getElementById("stopBtn");
-const voiceBtn       = document.getElementById("voiceBtn");
-const listeningHint  = document.getElementById("listeningHint");
-const inputWrap      = document.getElementById("inputWrap");
-const messagesWrap   = document.getElementById("messagesWrap");
-const messagesEl     = document.getElementById("messages");
-const welcomeState   = document.getElementById("welcomeState");
+const questionInput   = document.getElementById("questionInput");
+const runBtn          = document.getElementById("runBtn");
+const stopBtn         = document.getElementById("stopBtn");
+const voiceBtn        = document.getElementById("voiceBtn");
+const listeningHint   = document.getElementById("listeningHint");
+const inputWrap       = document.getElementById("inputWrap");
+const messagesWrap    = document.getElementById("messagesWrap");
+const messagesEl      = document.getElementById("messages");
+const welcomeState    = document.getElementById("welcomeState");
 const sidebarSessions = document.getElementById("sidebarSessions");
-const sidebarEmpty   = document.getElementById("sidebarEmpty");
-const newChatBtn     = document.getElementById("newChatBtn");
-const llmBadge       = document.getElementById("llmBadge");
-const llmBadgeText   = document.getElementById("llmBadgeText");
+const sidebarEmpty    = document.getElementById("sidebarEmpty");
+const newChatBtn      = document.getElementById("newChatBtn");
+const llmBadge        = document.getElementById("llmBadge");
+const llmBadgeText    = document.getElementById("llmBadgeText");
+const shareBtn        = document.getElementById("shareBtn");
+const shareModal      = document.getElementById("shareModal");
+const shareLinkInput  = document.getElementById("shareLink");
+const shareCopyBtn    = document.getElementById("shareCopyBtn");
+const shareCloseBtn   = document.getElementById("shareCloseBtn");
+const shareStatusEl   = document.getElementById("shareStatus");
+const shareBanner     = document.getElementById("shareBanner");
+const shareBannerTitle= document.getElementById("shareBannerTitle");
+const shareBannerClose= document.getElementById("shareBannerClose");
+const hamburger       = document.getElementById("hamburger");
+const sidebar         = document.getElementById("sidebar");
+const sidebarOverlay  = document.getElementById("sidebarOverlay");
 
 
 // ── localStorage helpers ──────────────────────────────────────
@@ -507,13 +712,28 @@ function getChat(id) {
   return getChats().find(c => c.id === id) || null;
 }
 function upsertChat(chat) {
-  const chats   = getChats().filter(c => c.id !== chat.id);
-  chats.unshift(chat);   // newest first
+  const chats = getChats().filter(c => c.id !== chat.id);
+  chats.unshift(chat);
   saveChats(chats);
 }
 function deleteChat(id) {
   saveChats(getChats().filter(c => c.id !== id));
 }
+
+
+// ── Mobile sidebar ────────────────────────────────────────────
+function openSidebar() {
+  sidebar.classList.add("open");
+  sidebarOverlay.classList.add("open");
+}
+function closeSidebar() {
+  sidebar.classList.remove("open");
+  sidebarOverlay.classList.remove("open");
+}
+hamburger.addEventListener("click", () => {
+  sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
+});
+sidebarOverlay.addEventListener("click", closeSidebar);
 
 
 // ── LLM status badge ──────────────────────────────────────────
@@ -523,19 +743,19 @@ async function refreshLLMStatus() {
     const data = await r.json();
     if (data.provider === "ollama") {
       if (data.available) {
-        llmBadge.className    = "llm-badge local";
+        llmBadge.className       = "llm-badge local";
         llmBadgeText.textContent = `LOCAL · ${data.model.split(":")[0]}`;
-        llmBadge.title        = `Ollama: ${data.model} (running)`;
+        llmBadge.title           = `Ollama: ${data.model} (running)`;
       } else {
-        llmBadge.className    = "llm-badge error";
+        llmBadge.className       = "llm-badge error";
         llmBadgeText.textContent = "LOCAL OFFLINE";
       }
     } else {
-      llmBadge.className    = "llm-badge cloud";
+      llmBadge.className       = "llm-badge cloud";
       llmBadgeText.textContent = `CLOUD · ${data.model.replace("gemini-","").replace("-flash","⚡")}`;
     }
   } catch {
-    llmBadge.className    = "llm-badge error";
+    llmBadge.className       = "llm-badge error";
     llmBadgeText.textContent = "LLM ERROR";
   }
 }
@@ -574,13 +794,14 @@ function startNewChat() {
   SESSION_ID   = crypto.randomUUID();
   currentTurns = [];
   messagesEl.innerHTML = "";
-  messagesEl.style.display  = "none";
+  messagesEl.style.display   = "none";
   welcomeState.style.display = "flex";
-  // Deselect sidebar item
   document.querySelectorAll(".session-item").forEach(el => el.classList.remove("active"));
   questionInput.value = "";
   questionInput.style.height = "auto";
   questionInput.focus();
+  updateShareBtnVisibility();
+  closeSidebar();
 }
 
 
@@ -589,19 +810,14 @@ async function submitQuery() {
   const q = questionInput.value.trim();
   if (!q || runBtn.disabled) return;
 
-  // Show messages area if first message in this session
   if (currentTurns.length === 0) {
     welcomeState.style.display = "none";
     messagesEl.style.display   = "flex";
   }
 
-  // Append user bubble
   appendUserMessage(q);
-
-  // Append assistant loading placeholder
   const loadingEl = appendLoadingMessage();
 
-  // Clear input
   questionInput.value = "";
   questionInput.style.height = "auto";
 
@@ -610,9 +826,8 @@ async function submitQuery() {
   _timedOut   = false;
   activeAbort = new AbortController();
 
-  // Progressive loading text
   let loadingTimer1 = setTimeout(() => updateLoadingText(loadingEl, "Running query… analyzing results with AI"), 4_000);
-  let loadingTimer2 = setTimeout(() => updateLoadingText(loadingEl, "Still working… model may be loading into GPU"), 20_000);
+  let loadingTimer2 = setTimeout(() => updateLoadingText(loadingEl, "Still working… model may be loading into memory"), 20_000);
   const safetyTimer = setTimeout(() => { _timedOut = true; if (activeAbort) activeAbort.abort(); }, 270_000);
 
   try {
@@ -625,25 +840,24 @@ async function submitQuery() {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || "Query failed");
 
-    // Replace loading with result card
     replaceLoadingWithResult(loadingEl, data.data);
 
-    // Persist turn
     const turn = {
-      role:      "turn",
-      question:  q,
-      data:      trimDataForStorage(data.data),
-      ts:        new Date().toISOString(),
+      role:     "turn",
+      question: q,
+      data:     trimDataForStorage(data.data),
+      ts:       new Date().toISOString(),
     };
     currentTurns.push(turn);
     persistCurrentSession(q);
+    updateShareBtnVisibility();
 
   } catch (err) {
     let msg;
     if (err.name === "AbortError") {
       msg = _timedOut
-        ? "Query timed out after 4.5 min. Check that Ollama is running and using your GPU (run: ollama ps)."
-        : null;  // user clicked STOP — remove loading bubble silently
+        ? "Query timed out after 4.5 min. Check that Ollama is running (run: ollama ps)."
+        : null;
     } else {
       msg = err.message;
     }
@@ -654,7 +868,7 @@ async function submitQuery() {
       currentTurns.push(turn);
       persistCurrentSession(q);
     } else {
-      loadingEl.remove();  // STOP clicked — quietly remove
+      loadingEl.remove();
     }
 
   } finally {
@@ -668,7 +882,7 @@ async function submitQuery() {
 }
 
 
-// ── Persist current session to localStorage ───────────────────
+// ── Persist session to localStorage ──────────────────────────
 function persistCurrentSession(firstQuestion) {
   const chat = getChat(SESSION_ID) || {
     id:        SESSION_ID,
@@ -682,7 +896,7 @@ function persistCurrentSession(firstQuestion) {
 }
 
 
-// ── Trim result data for localStorage ────────────────────────
+// ── Trim data for localStorage ────────────────────────────────
 function trimDataForStorage(data) {
   if (!data) return data;
   const trimmed = { ...data };
@@ -750,8 +964,6 @@ function replaceLoadingWithError(loadingEl, msg) {
 
 
 // ── Simple markdown → HTML renderer ──────────────────────────
-// Handles the subset Ollama/Gemini commonly outputs: bold, italic,
-// inline code, bullet lists, numbered lists, headings, paragraphs.
 function renderMd(text) {
   if (!text) return "";
   const lines  = text.split("\n");
@@ -775,14 +987,12 @@ function renderMd(text) {
 
     if (!line) { closeLists(); out.push(""); continue; }
 
-    // Headings
     if (/^#{1,3}\s/.test(line)) {
       closeLists();
       out.push(`<h3>${inlineFormat(line.replace(/^#+\s/, ""))}</h3>`);
       continue;
     }
 
-    // Unordered list: "- " or "* "
     const ulMatch = line.match(/^[-*•]\s+(.*)/);
     if (ulMatch) {
       if (inOl) { out.push("</ol>"); inOl = false; }
@@ -791,7 +1001,6 @@ function renderMd(text) {
       continue;
     }
 
-    // Ordered list: "1. " "2. " etc
     const olMatch = line.match(/^\d+\.\s+(.*)/);
     if (olMatch) {
       if (inUl) { out.push("</ul>"); inUl = false; }
@@ -808,7 +1017,7 @@ function renderMd(text) {
 }
 
 
-// ── Build a result message (AI summary + collapsible raw data) ─
+// ── Build a result message card ───────────────────────────────
 function buildResultCard(data) {
   const wrapper = document.createElement("div");
 
@@ -818,7 +1027,7 @@ function buildResultCard(data) {
   const count   = data.queryType === "dual" ? (data.summary?.primary?.count ?? 0) : (data.summary?.count ?? 0);
   const elapsed = data.meta?.elapsedSeconds;
 
-  // ── 1. AI summary ──────────────────────────────────────────
+  // 1. AI summary
   if (data.aiSummary) {
     const summaryEl = document.createElement("div");
     summaryEl.className = "ai-summary";
@@ -831,7 +1040,7 @@ function buildResultCard(data) {
     wrapper.appendChild(empty);
   }
 
-  // ── 2. Collapsible raw data ────────────────────────────────
+  // 2. Collapsible raw data
   const toggle = document.createElement("button");
   toggle.className = "raw-data-toggle";
   toggle.innerHTML = `<span class="toggle-arrow">▶</span> Raw Data (${count} result${count !== 1 ? "s" : ""})`;
@@ -841,7 +1050,6 @@ function buildResultCard(data) {
   rawSection.className = "raw-data-section";
   wrapper.appendChild(rawSection);
 
-  // Build the inner card (table/json/pipeline)
   const card = document.createElement("div");
   card.className = "result-card";
   rawSection.appendChild(card);
@@ -849,7 +1057,7 @@ function buildResultCard(data) {
   const state = { rows, page: 1, view: "table", data };
   msgState.set(card, state);
 
-  // Card header with tabs
+  // Card header with 6 tabs
   const header = document.createElement("div");
   header.className = "result-card-header";
   header.innerHTML = `
@@ -862,6 +1070,9 @@ function buildResultCard(data) {
         <button class="tab-btn active" data-view="table">TABLE</button>
         <button class="tab-btn"        data-view="json">JSON</button>
         <button class="tab-btn"        data-view="pipeline">PIPELINE</button>
+        <button class="tab-btn"        data-view="plan">PLAN</button>
+        <button class="tab-btn"        data-view="dataview">DATA</button>
+        <button class="tab-btn"        data-view="steps">STEPS</button>
       </div>
     </div>
   `;
@@ -952,6 +1163,15 @@ function renderCardBody(card) {
     pre.className = "code-view pipeline-view";
     pre.textContent = JSON.stringify(pipe, null, 2);
     body.appendChild(pre);
+  } else if (state.view === "plan") {
+    pageBar.style.display = "none";
+    renderPlanView(body, data);
+  } else if (state.view === "dataview") {
+    pageBar.style.display = "none";
+    renderDataView(body, data, state);
+  } else if (state.view === "steps") {
+    pageBar.style.display = "none";
+    renderStepsView(body, data);
   }
 }
 
@@ -981,6 +1201,192 @@ function renderTableInBody(body, pageBar, state) {
 }
 
 
+// ── PLAN view ─────────────────────────────────────────────────
+function renderPlanView(body, data) {
+  const plan = data.queryPlan;
+  const explanation = data.explanation || "";
+  const div = document.createElement("div");
+  div.className = "plan-view";
+
+  let html = "";
+
+  if (plan) {
+    // Databases & collections
+    html += `<div class="plan-section">`;
+    html += `<div class="plan-section-title">Databases Queried</div>`;
+    if (plan.queryType === "single") {
+      html += `<span class="plan-db-chip">
+        <span class="chip-db">${escHtml(plan.databases[0] || "unknown")}</span>
+        <span class="chip-arr">›</span>
+        <span class="chip-col">${escHtml(plan.collections[0] || "unknown")}</span>
+      </span>`;
+    } else if (plan.dualQueries) {
+      plan.dualQueries.forEach(q => {
+        html += `<span class="plan-db-chip">
+          <span class="chip-db">${escHtml(q.database)}</span>
+          <span class="chip-arr">›</span>
+          <span class="chip-col">${escHtml(q.collection)}</span>
+        </span>`;
+      });
+    }
+    html += `</div>`;
+
+    // Query type
+    html += `<div class="plan-section">`;
+    html += `<div class="plan-section-title">Query Type</div>`;
+    const typeLabel = plan.queryType === "dual"
+      ? "Cross-database join — two queries merged by owner key"
+      : "Single database query";
+    html += `<div style="font-size:12px;color:var(--text)">${escHtml(typeLabel)}</div>`;
+    html += `</div>`;
+
+    // Pipeline
+    html += `<div class="plan-section">`;
+    html += `<div class="plan-section-title">Pipeline</div>`;
+    html += `<div style="font-size:12px;color:var(--text)">${plan.stageCount} aggregation stage${plan.stageCount !== 1 ? "s" : ""}</div>`;
+    html += `</div>`;
+  }
+
+  if (explanation) {
+    html += `<div class="plan-section">`;
+    html += `<div class="plan-section-title">How This Query Was Generated</div>`;
+    html += `<div class="plan-explanation">${escHtml(explanation)}</div>`;
+    html += `</div>`;
+  } else if (!plan) {
+    html += `<div style="color:var(--dimmer);font-size:12px;padding:.5rem 0">No plan information available for this result.</div>`;
+  }
+
+  div.innerHTML = html;
+  body.appendChild(div);
+}
+
+
+// ── DATA view — raw DB results + AI analysis ──────────────────
+function renderDataView(body, data, state) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "data-view";
+
+  // Section 1: raw DB results
+  const rawSection = document.createElement("div");
+  rawSection.className = "data-section";
+  const rawLabel = document.createElement("div");
+  rawLabel.className = "data-section-label";
+  rawLabel.textContent = `Raw Database Results  (${state.rows.length} record${state.rows.length !== 1 ? "s" : ""})`;
+  rawSection.appendChild(rawLabel);
+  const rawBody = document.createElement("div");
+  rawBody.className = "data-section-body";
+  if (state.rows.length > 0) {
+    rawBody.appendChild(buildTable(state.rows.slice(0, 10)));
+    if (state.rows.length > 10) {
+      const note = document.createElement("div");
+      note.style.cssText = "padding:.4rem .875rem;font-size:10px;color:var(--dimmer);background:var(--bg2);border-top:1px solid var(--border)";
+      note.textContent = `Showing first 10 of ${state.rows.length} rows. Switch to TABLE tab for full pagination.`;
+      rawBody.appendChild(note);
+    }
+  } else {
+    rawBody.style.cssText = "padding:1rem;color:var(--dimmer);font-size:12px;";
+    rawBody.textContent = "No records returned.";
+  }
+  rawSection.appendChild(rawBody);
+  wrapper.appendChild(rawSection);
+
+  // Section 2: AI analysis
+  const analysisSection = document.createElement("div");
+  analysisSection.className = "data-section";
+  const analysisLabel = document.createElement("div");
+  analysisLabel.className = "data-section-label";
+  analysisLabel.textContent = "AI Analysis";
+  analysisSection.appendChild(analysisLabel);
+  const analysisBody = document.createElement("div");
+  analysisBody.className = "data-analysis-body";
+  if (data.aiSummary) {
+    const aiDiv = document.createElement("div");
+    aiDiv.className = "ai-summary";
+    aiDiv.style.padding = "0";
+    aiDiv.style.fontSize = "12px";
+    aiDiv.innerHTML = renderMd(data.aiSummary);
+    analysisBody.appendChild(aiDiv);
+  } else {
+    analysisBody.style.color = "var(--dimmer)";
+    analysisBody.style.fontSize = "12px";
+    analysisBody.textContent = "No AI analysis available for this result.";
+  }
+  analysisSection.appendChild(analysisBody);
+  wrapper.appendChild(analysisSection);
+
+  body.appendChild(wrapper);
+}
+
+
+// ── STEPS view — human-written execution plan ─────────────────
+function buildExecutionSteps(data) {
+  const steps = [];
+  const plan  = data.queryPlan;
+  const meta  = data.meta;
+
+  steps.push("Question received from user.");
+
+  if (plan) {
+    if (plan.queryType === "single") {
+      const db  = plan.databases[0]  || "stream-datastore";
+      const col = plan.collections[0] || meta?.collectionUsed || "unknown";
+      steps.push(`Question analyzed and routed to the ${db} database.`);
+      steps.push(`Target collection resolved to ${col}.`);
+      steps.push("Retrieved similar past queries from the RAG example store to use as few-shot demonstrations.");
+      steps.push(`Generated a ${plan.stageCount}-stage MongoDB aggregation pipeline using the local LLM.`);
+      steps.push(`Executed the pipeline against the ${col} collection.`);
+    } else if (plan.queryType === "dual" && plan.dualQueries) {
+      const q1 = plan.dualQueries[0];
+      const q2 = plan.dualQueries[1];
+      steps.push("Question requires data from two databases.");
+      steps.push("Retrieved similar past queries from the RAG example store.");
+      steps.push("Generated separate MongoDB pipelines for each database.");
+      steps.push(`Fetched data from ${q1.database}, collection ${q1.collection} (${q1.stageCount} pipeline stage${q1.stageCount !== 1 ? "s" : ""}).`);
+      steps.push(`Fetched data from ${q2.database}, collection ${q2.collection} (${q2.stageCount} pipeline stage${q2.stageCount !== 1 ? "s" : ""}).`);
+      steps.push("Merged results from both databases by matching owner keys.");
+    } else {
+      steps.push("Query was generated using schema context and past examples.");
+      steps.push("Pipeline was executed against the target collection.");
+    }
+  } else {
+    steps.push("Query was generated using the local LLM with schema context.");
+    steps.push("Pipeline was executed against the target collection.");
+  }
+
+  const count = data.queryType === "dual"
+    ? (data.summary?.primary?.count ?? 0)
+    : (data.summary?.count ?? 0);
+  steps.push(`Query returned ${count} result${count !== 1 ? "s" : ""} from the database.`);
+
+  if (data.aiSummary) {
+    steps.push("AI model analyzed the results and generated a human-readable summary.");
+  }
+
+  if (meta?.elapsedSeconds != null) {
+    steps.push(`Total processing time was ${meta.elapsedSeconds} seconds from question to response.`);
+  }
+
+  return steps;
+}
+
+function renderStepsView(body, data) {
+  const steps = buildExecutionSteps(data);
+  const div   = document.createElement("div");
+  div.className = "steps-view";
+
+  let html = "";
+  steps.forEach((step, i) => {
+    html += `<div class="step-row">
+      <div class="step-num">${i + 1}</div>
+      <div class="step-text">${escHtml(step)}</div>
+    </div>`;
+  });
+
+  div.innerHTML = html;
+  body.appendChild(div);
+}
+
+
 // ── Sidebar rendering ─────────────────────────────────────────
 function renderSidebar() {
   const chats = getChats();
@@ -991,7 +1397,6 @@ function renderSidebar() {
     return;
   }
 
-  // Group by date label
   const groups = {};
   chats.forEach(chat => {
     const label = dateGroupLabel(chat.createdAt);
@@ -1014,7 +1419,7 @@ function renderSidebar() {
 function buildSidebarEmpty() {
   const d = document.createElement("div");
   d.className = "sidebar-empty";
-  d.textContent = "No conversations yet.\nAsk a question to start.";
+  d.innerHTML = "No conversations yet.<br>Ask a question to start.";
   return d;
 }
 
@@ -1029,20 +1434,18 @@ function buildSessionItem(chat) {
   item.innerHTML = `
     <span class="session-title">${escHtml(chat.title || "Untitled")}</span>
     <span class="session-meta">${ts} · ${turnCount} turn${turnCount !== 1 ? "s" : ""}</span>
-    <button class="session-del" title="Delete this conversation">×</button>
+    <button class="session-del" title="Delete">×</button>
   `;
 
-  // Click → load conversation (no re-run)
   item.addEventListener("click", e => {
     if (e.target.classList.contains("session-del")) return;
     loadSession(chat.id);
+    closeSidebar();
   });
 
-  // Delete
   item.querySelector(".session-del").addEventListener("click", e => {
     e.stopPropagation();
     deleteChat(chat.id);
-    // If deleting the active session, start fresh
     if (chat.id === SESSION_ID) startNewChat();
     renderSidebar();
   });
@@ -1052,9 +1455,9 @@ function buildSessionItem(chat) {
 
 function dateGroupLabel(iso) {
   if (!iso) return "Earlier";
-  const d     = new Date(iso);
-  const now   = new Date();
-  const diffMs = now - d;
+  const d       = new Date(iso);
+  const now     = new Date();
+  const diffMs  = now - d;
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
   if (diffDays < 1)  return "Today";
   if (diffDays < 2)  return "Yesterday";
@@ -1064,7 +1467,7 @@ function dateGroupLabel(iso) {
 }
 
 
-// ── Load a stored session into the chat area ──────────────────
+// ── Load a stored session ─────────────────────────────────────
 function loadSession(chatId) {
   const chat = getChat(chatId);
   if (!chat) return;
@@ -1076,7 +1479,6 @@ function loadSession(chatId) {
   welcomeState.style.display = "none";
   messagesEl.style.display   = "flex";
 
-  // Render all stored turns
   currentTurns.forEach(turn => {
     appendUserMessage(turn.question);
     if (turn.error) {
@@ -1090,46 +1492,174 @@ function loadSession(chatId) {
       `;
       messagesEl.appendChild(wrap);
     } else if (turn.data) {
-      const wrap = document.createElement("div");
+      const wrap   = document.createElement("div");
       wrap.className = "msg msg-assistant";
-      const body = document.createElement("div");
-      body.className = "msg-assistant-body";
-      body.appendChild(buildResultCard(turn.data));
-      wrap.innerHTML = "";
       const avatar = document.createElement("div");
       avatar.className = "msg-assistant-avatar";
       avatar.textContent = "AI";
+      const body = document.createElement("div");
+      body.className = "msg-assistant-body";
+      body.appendChild(buildResultCard(turn.data));
       wrap.appendChild(avatar);
       wrap.appendChild(body);
       messagesEl.appendChild(wrap);
     }
   });
 
-  // Mark as active in sidebar
   document.querySelectorAll(".session-item").forEach(el => {
     el.classList.toggle("active", el.dataset.id === chatId);
   });
 
   scrollToBottom();
   questionInput.focus();
+  updateShareBtnVisibility();
 }
 
 
-// ── Scroll chat to bottom ─────────────────────────────────────
+// ── Share button visibility ───────────────────────────────────
+function updateShareBtnVisibility() {
+  shareBtn.style.display = currentTurns.length > 0 ? "" : "none";
+}
+
+
+// ── Share modal ───────────────────────────────────────────────
+shareBtn.addEventListener("click", openShareModal);
+shareCloseBtn.addEventListener("click", closeShareModal);
+shareModal.addEventListener("click", e => { if (e.target === shareModal) closeShareModal(); });
+
+shareCopyBtn.addEventListener("click", () => {
+  const link = shareLinkInput.value;
+  if (!link) return;
+  navigator.clipboard.writeText(link)
+    .then(() => {
+      shareCopyBtn.textContent = "COPIED ✓";
+      setTimeout(() => shareCopyBtn.textContent = "COPY", 2000);
+    })
+    .catch(() => {
+      shareCopyBtn.textContent = "FAILED";
+      setTimeout(() => shareCopyBtn.textContent = "COPY", 2000);
+    });
+});
+
+async function openShareModal() {
+  shareModal.classList.add("open");
+  shareLinkInput.value = "";
+  shareStatusEl.textContent = "Saving conversation to database…";
+  shareCopyBtn.disabled = true;
+
+  try {
+    const chat  = getChat(SESSION_ID);
+    const title = chat?.title || currentTurns[0]?.question?.slice(0, 60) || "Shared Chat";
+    const turns = currentTurns.map(t => ({
+      question: t.question,
+      ts:       t.ts,
+      data:     t.data ? trimDataForStorage(t.data) : null,
+      error:    t.error || null,
+    }));
+
+    const res  = await fetch("/api/share", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ turns, title }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      const url = `${location.origin}/share/${data.share_id}`;
+      shareLinkInput.value = url;
+      shareStatusEl.textContent = "Anyone with this link can view and continue the conversation.";
+      shareCopyBtn.disabled = false;
+    } else {
+      shareStatusEl.textContent = "Failed: " + (data.error || "Unknown error");
+    }
+  } catch (e) {
+    shareStatusEl.textContent = "Network error. Is the server running?";
+  }
+}
+
+function closeShareModal() {
+  shareModal.classList.remove("open");
+}
+
+
+// ── Share banner ──────────────────────────────────────────────
+shareBannerClose.addEventListener("click", () => {
+  shareBanner.style.display = "none";
+});
+
+
+// ── Shared chat URL detection on load ─────────────────────────
+async function checkSharedChatUrl() {
+  const match = location.pathname.match(/^\/share\/([a-f0-9]{16})$/);
+  if (!match) return;
+
+  const shareId = match[1];
+
+  try {
+    const res  = await fetch(`/api/share/${shareId}`);
+    const json = await res.json();
+
+    if (!json.success || !json.data) return;
+    const shared = json.data;
+
+    SESSION_ID   = crypto.randomUUID();
+    currentTurns = [];
+
+    messagesEl.style.display   = "flex";
+    welcomeState.style.display = "none";
+
+    const sharedTurns = shared.turns || [];
+    sharedTurns.forEach(turn => {
+      if (turn.question) appendUserMessage(turn.question);
+      if (turn.error) {
+        const wrap = document.createElement("div");
+        wrap.className = "msg msg-assistant";
+        wrap.innerHTML = `
+          <div class="msg-assistant-avatar">AI</div>
+          <div class="msg-assistant-body">
+            <div class="msg-error-card"><span class="msg-error-label">ERROR: </span>${escHtml(turn.error)}</div>
+          </div>`;
+        messagesEl.appendChild(wrap);
+      } else if (turn.data) {
+        const wrap   = document.createElement("div");
+        wrap.className = "msg msg-assistant";
+        const avatar = document.createElement("div");
+        avatar.className = "msg-assistant-avatar";
+        avatar.textContent = "AI";
+        const body = document.createElement("div");
+        body.className = "msg-assistant-body";
+        body.appendChild(buildResultCard(turn.data));
+        wrap.appendChild(avatar);
+        wrap.appendChild(body);
+        messagesEl.appendChild(wrap);
+      }
+    });
+
+    shareBannerTitle.textContent = shared.title || "Shared Chat";
+    shareBanner.style.display    = "flex";
+
+    scrollToBottom();
+  } catch (e) {
+    console.error("[share] Failed to load shared chat:", e);
+  }
+}
+
+checkSharedChatUrl();
+
+
+// ── Scroll to bottom ──────────────────────────────────────────
 function scrollToBottom() {
-  requestAnimationFrame(() => {
-    messagesWrap.scrollTop = messagesWrap.scrollHeight;
-  });
+  requestAnimationFrame(() => { messagesWrap.scrollTop = messagesWrap.scrollHeight; });
 }
 
 
 // ── Loading state ─────────────────────────────────────────────
 function setLoading(on) {
-  runBtn.disabled  = on;
-  voiceBtn.disabled = on;
-  questionInput.disabled = on;
-  runBtn.style.display  = on ? "none" : "";
-  stopBtn.style.display = on ? ""     : "none";
+  runBtn.disabled         = on;
+  voiceBtn.disabled       = on;
+  questionInput.disabled  = on;
+  runBtn.style.display    = on ? "none" : "";
+  stopBtn.style.display   = on ? ""     : "none";
 }
 
 
@@ -1145,7 +1675,7 @@ const PRIORITY = [
 function buildTable(docs) {
   const flat    = docs.map(flattenDoc);
   const allKeys = [...new Set(flat.flatMap(d => Object.keys(d)))];
-  const cols = [
+  const cols    = [
     ...PRIORITY.filter(k => allKeys.includes(k)),
     ...allKeys.filter(k => !PRIORITY.includes(k)),
   ].slice(0, 16);
@@ -1223,7 +1753,7 @@ function startVoice() {
     questionInput.dispatchEvent(new Event("input"));
   };
   recognition.onend   = () => { stopVoiceUI(); if (lastTranscript.trim()) submitQuery(); };
-  recognition.onerror = e => { stopVoiceUI(); };
+  recognition.onerror = () => { stopVoiceUI(); };
   recognition.start();
 }
 
