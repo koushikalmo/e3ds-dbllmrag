@@ -302,6 +302,8 @@ async def share_chat(body: ShareRequest):
     try:
         share_id = await create_share(body.turns, body.title)
         return JSONResponse(content={"success": True, "share_id": share_id})
+    except asyncio.CancelledError:
+        raise
     except Exception as e:
         import traceback
         print(f"[/api/share] Error:\n{traceback.format_exc()}")

@@ -1,4 +1,5 @@
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
@@ -22,13 +23,13 @@ async def create_share(turns: list, title: str = "") -> str:
     """
     share_id = uuid.uuid4().hex[:16]
     db = get_stream_db()
-    await db[SHARE_COLLECTION].insert_one({
+    await asyncio.shield(db[SHARE_COLLECTION].insert_one({
         "share_id":   share_id,
         "title":      title or "Shared Chat",
         "turns":      turns,
         "created_at": datetime.now(timezone.utc),
         "view_count": 0,
-    })
+    }))
     return share_id
 
 # Shareable chat access using link  
