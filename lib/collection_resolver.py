@@ -79,3 +79,19 @@ def resolve_and_log(question: str, default_collection: str) -> str:
     else:
         print(f"[resolver] Using default collection: '{resolved}'")
     return resolved
+
+
+_PATTERN_YEAR_ONLY = re.compile(r'\b(20\d{2})\b')
+_MONTH_ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
+
+def resolve_year(question: str) -> int | None:
+    """Return the year if the question targets a full year with no specific month mentioned."""
+    if _PATTERN_MONTH_ONLY.search(question):
+        return None  # specific month takes precedence
+    m = _PATTERN_YEAR_ONLY.search(question)
+    return int(m.group(1)) if m else None
+
+
+def all_collections_for_year(year: int) -> list[str]:
+    return [f"{m}_{year}" for m in _MONTH_ABBRS]

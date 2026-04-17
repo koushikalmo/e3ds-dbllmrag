@@ -152,6 +152,31 @@ BOOTSTRAP_EXAMPLES = [
         "result_count": 20, "db_hint": "both",
     },
     {
+        "question": "Give all users name and streaming time of april 16 2026",
+        "query": {
+            "queryType": "single", "database": "stream-datastore", "collection": "Apr_2026",
+            "operation": "aggregate",
+            "pipeline": [
+                {"$match": {
+                    "e3ds_employee": {"$ne": True},
+                    "VideoStreamStartedAt_Timestamp": {"$gte": 1776297600, "$lt": 1776384000},
+                }},
+                {"$addFields": {"streamingSeconds": {"$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"]}}},
+                {"$match": {"streamingSeconds": {"$gt": 0}}},
+                {"$project": {
+                    "owner": "$appInfo.owner",
+                    "streamingSeconds": 1,
+                    "streamingMinutes": {"$divide": ["$streamingSeconds", 60]},
+                }},
+                {"$sort": {"streamingSeconds": -1}},
+                {"$limit": 200},
+            ],
+            "explanation": "Lists all users with their streaming duration on April 16 2026.",
+            "resultLabel": "User Streaming Time — Apr 16 2026",
+        },
+        "result_count": 50, "db_hint": "stream",
+    },
+    {
         "question": "Show active subscriptions with sessions count for each owner",
         "query": {
             "queryType": "dual",

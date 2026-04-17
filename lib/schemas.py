@@ -125,6 +125,9 @@ AGGREGATE $LIMIT RULES:
 STREAM-DATASTORE RULES
 ═══════════════════════════════════════════════
 - Collections are named by month: "Apr_2026", "Mar_2026", "Feb_2026", etc.
+- YEAR QUERIES: If the user asks about a full year (e.g. "in 2026", "during 2026"),
+  use the earliest available month as the collection (e.g. "Jan_2026").
+  The backend automatically expands the query across all months of that year.
 - ALWAYS filter internal traffic first: { "e3ds_employee": { "$ne": true } }
   This uses $ne:true (not equals true) instead of false, so it correctly includes
   documents where e3ds_employee is absent, null, or false — all are real user sessions.
@@ -132,13 +135,23 @@ STREAM-DATASTORE RULES
   For countDocuments/find/distinct: include in "query": { "e3ds_employee": { "$ne": true } }
 
 - ALL *_Timestamp fields are FLOATS (Unix seconds).
-  Session duration: { "$subtract": ["$DisconnectTime_Timestamp", "$startTimeStamp"] } → seconds
+  Session start:    VideoStreamStartedAt_Timestamp  ← use this, NOT startTimeStamp
+  Session end:      DisconnectTime_Timestamp
+  Session duration: { "$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"] } → seconds
   To minutes: { "$divide": [duration_seconds, 60] }
+
+DATE FILTERING — CRITICAL:
+  The current Unix timestamp is provided in every request. Use it as your reference point.
+  DO NOT guess or hardcode timestamps — calculate from the provided Current Unix timestamp.
+  April 16, 2026 = start: 1776297600, end: 1776384000
+  To filter a specific day: { "VideoStreamStartedAt_Timestamp": { "$gte": <day_start>, "$lt": <day_end> } }
 
 - webRtcStatsData.avgRoundTripTime is stored as a STRING.
   Always convert before sorting/comparing: { "$toDouble": "$webRtcStatsData.avgRoundTripTime" }
 
 CRITICAL FIELD NAMES (exact case — wrong names return 0 results):
+- Session start:"VideoStreamStartedAt_Timestamp"  ← NOT startTimeStamp
+- Session end:  "DisconnectTime_Timestamp"
 - Country:      "clientInfo.country_name"  ← full name like "Brazil". NEVER "country_code".
 - City:         "clientInfo.city"          ← viewer's city (client location)
 - OS:           "userDeviceInfo.os.name"
@@ -238,7 +251,6 @@ def build_system_prompt(
     include_appconfigs: bool = False,
     schema_context:     str  = "",
 ) -> str:
-    """Assemble the full LLM system prompt for this query."""
     parts = [_CORE_RULES]
     if include_stream:
         parts.append(_STREAM_STRUCTURE)

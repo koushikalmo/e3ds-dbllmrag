@@ -47,7 +47,7 @@ def _get_known_fields() -> set[str]:
         "webRtcStatsData.avgBitrate", "webRtcStatsData.packetsLost",
         "webRtcStatsData.avgRoundTripTime",
         "elInfo.computerName", "elInfo.systemInfo.cpu.brand",
-        "startTimeStamp", "DisconnectTime_Timestamp", "loadTime",
+        "VideoStreamStartedAt_Timestamp", "DisconnectTime_Timestamp", "loadTime",
         "e3ds_employee", "maxUserLimit",
         "SubscriptionEndDate._seconds", "SubscriptionStartDate._seconds",
     }
@@ -207,14 +207,18 @@ def _validate_field_names(query_obj: dict) -> list[str]:
 
 # Common LLM field name mistakes → correct field
 _FIELD_ALIASES: dict[str, str] = {
-    "clientinfo.country_code":  "clientInfo.country_name",
-    "clientinfo.countrycode":   "clientInfo.country_name",
-    "clientinfo.country":       "clientInfo.country_name",
-    "appinfo.appname":          "appInfo.appName",
-    "appinfo.app_name":         "appInfo.appName",
-    "userdeviceinfo.os":        "userDeviceInfo.os.name",
-    "webrtcstatsdata.bitrate":  "webRtcStatsData.avgBitrate",
-    "webrtcstatsdata.rtt":      "webRtcStatsData.avgRoundTripTime",
+    "clientinfo.country_code":          "clientInfo.country_name",
+    "clientinfo.countrycode":           "clientInfo.country_name",
+    "clientinfo.country":               "clientInfo.country_name",
+    "appinfo.appname":                  "appInfo.appName",
+    "appinfo.app_name":                 "appInfo.appName",
+    "userdeviceinfo.os":                "userDeviceInfo.os.name",
+    "webrtcstatsdata.bitrate":          "webRtcStatsData.avgBitrate",
+    "webrtcstatsdata.rtt":              "webRtcStatsData.avgRoundTripTime",
+    "starttimestamp":                   "VideoStreamStartedAt_Timestamp",
+    "videostreamstartedat_timestamp":   "VideoStreamStartedAt_Timestamp",
+    "sessionstart":                     "VideoStreamStartedAt_Timestamp",
+    "session_start":                    "VideoStreamStartedAt_Timestamp",
 }
 
 

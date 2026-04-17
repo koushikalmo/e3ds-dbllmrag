@@ -24,7 +24,8 @@ from lib.chat_history       import save_query, get_history, delete_entry, clear_
 from lib.chat_sharing       import create_share, get_share
 from lib.query_examples     import index_all_examples_async
 from lib.session_memory     import add_turn, get_context_text, clear_session, active_session_count
-from lib.collection_resolver import resolve_and_log
+from lib.collection_resolver import resolve_and_log, resolve_year
+from lib.query_executor     import get_existing_year_collections, build_year_pipeline
 from lib.response_validator import validate_query_and_result
 from lib.feedback_store     import save_feedback, get_feedback_stats
 
@@ -148,6 +149,22 @@ async def run_query(body: QueryRequest):
             collection       = collection,
             conversation_ctx = conversation_ctx,
         )
+
+        # Year query: expand single-collection pipeline across all months via $unionWith
+        year = resolve_year(body.question.strip())
+        if (
+            year
+            and query_obj.get("queryType") == "single"
+            and query_obj.get("database") == "stream-datastore"
+            and isinstance(query_obj.get("pipeline"), list)
+        ):
+            year_colls = await get_existing_year_collections(query_obj["database"], year)
+            primary    = query_obj.get("collection", "")
+            extras     = [c for c in year_colls if c != primary]
+            if extras:
+                query_obj["pipeline"] = build_year_pipeline(query_obj["pipeline"], extras)
+                print(f"[year_query] Expanded across {len(year_colls)} collections for {year}: {year_colls}")
+
         result = await execute_query(query_obj)
 
         rows_for_analysis = result.get("results", [])

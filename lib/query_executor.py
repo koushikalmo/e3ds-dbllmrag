@@ -213,6 +213,31 @@ def _raise_friendly(err: Exception, database: str, coll_name: str):
 _run_single = _run_aggregate  # backward-compat alias
 
 
+async def get_existing_year_collections(database: str, year: int) -> list[str]:
+    from lib.collection_resolver import all_collections_for_year
+    db       = _get_db(database)
+    existing = set(await db.list_collection_names())
+    return [c for c in all_collections_for_year(year) if c in existing]
+
+
+def build_year_pipeline(pipeline: list, extra_collections: list[str]) -> list:
+    # Stages before $group/$count run per-collection inside each $unionWith.
+    # $group and beyond run once after all months are unioned together.
+    _REDUCE_OPS = {"$group", "$count", "$bucket", "$bucketAuto", "$facet"}
+    split = next(
+        (i for i, s in enumerate(pipeline) if isinstance(s, dict) and any(op in s for op in _REDUCE_OPS)),
+        len(pipeline),
+    )
+    pre  = pipeline[:split]
+    post = pipeline[split:]
+
+    expanded = list(pre)
+    for coll in extra_collections:
+        expanded.append({"$unionWith": {"coll": coll, "pipeline": list(pre)}})
+    expanded.extend(post)
+    return expanded
+
+
 async def execute_query(query_obj: dict) -> dict:
     if query_obj["queryType"] == "single":
         operation = query_obj.get("operation", "aggregate")
