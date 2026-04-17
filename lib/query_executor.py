@@ -69,10 +69,28 @@ def _normalize_pipeline(pipeline: list) -> list:
     return [{"$match": _normalize_match_query(s["$match"])} if "$match" in s else s for s in pipeline]
 
 
+def _split_multi_key_stages(pipeline: list) -> list:
+    # MongoDB requires each stage object to have exactly one key.
+    # The LLM occasionally merges two stages into one dict — split them here.
+    result = []
+    for stage in pipeline:
+        if not isinstance(stage, dict):
+            result.append(stage)
+            continue
+        keys = [k for k in stage if k.startswith("$")]
+        if len(keys) <= 1:
+            result.append(stage)
+        else:
+            print(f"[executor] WARNING: split multi-key stage {keys} into {len(keys)} stages")
+            for k in keys:
+                result.append({k: stage[k]})
+    return result
+
+
 def _sanitize_pipeline(pipeline: list) -> list:
     # remove $out/$merge — read-only safety
     clean = []
-    for stage in pipeline:
+    for stage in _split_multi_key_stages(pipeline):
         op = next(iter(stage), None)
         if op in _WRITE_STAGES:
             print(f"[executor] SECURITY: stripped '{op}' stage")
@@ -207,6 +225,11 @@ def _raise_friendly(err: Exception, database: str, coll_name: str):
         )
     if "BSONObjectTooLarge" in s:
         raise ValueError("Result exceeded 16MB. Add a $project to return fewer fields.")
+    if "40323" in s or "exactly one field" in s:
+        raise ValueError(
+            "Pipeline stage has multiple operators in one object — the LLM merged two stages. "
+            "Try rephrasing the question so the query is regenerated."
+        )
     raise err
 
 
@@ -224,12 +247,13 @@ def build_year_pipeline(pipeline: list, extra_collections: list[str]) -> list:
     # Stages before $group/$count run per-collection inside each $unionWith.
     # $group and beyond run once after all months are unioned together.
     _REDUCE_OPS = {"$group", "$count", "$bucket", "$bucketAuto", "$facet"}
+    clean = _split_multi_key_stages(pipeline)
     split = next(
-        (i for i, s in enumerate(pipeline) if isinstance(s, dict) and any(op in s for op in _REDUCE_OPS)),
-        len(pipeline),
+        (i for i, s in enumerate(clean) if isinstance(s, dict) and any(op in s for op in _REDUCE_OPS)),
+        len(clean),
     )
-    pre  = pipeline[:split]
-    post = pipeline[split:]
+    pre  = clean[:split]
+    post = clean[split:]
 
     expanded = list(pre)
     for coll in extra_collections:
