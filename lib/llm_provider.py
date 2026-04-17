@@ -1,6 +1,3 @@
-# lib/llm_provider.py — Ollama local LLM interface
-# All LLM calls go through this module. JSON mode forces valid JSON at token level.
-
 import os
 import httpx
 
@@ -27,7 +24,6 @@ class OllamaProvider:
         return f"ollama:{self.model}"
 
     async def generate(self, system_prompt: str, user_message: str, json_mode: bool = True) -> str:
-        """Send prompt to Ollama. json_mode=True forces valid JSON output at token level."""
         payload = {
             "model":    self.model,
             "messages": [
@@ -64,7 +60,6 @@ class OllamaProvider:
         return text
 
     async def is_available(self) -> bool:
-        """True if Ollama is running and our model is downloaded."""
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 r = await client.get(f"{self.base_url}/api/tags")
@@ -92,7 +87,6 @@ async def generate_with_ollama(
 
 
 async def warmup_model() -> None:
-    """Pre-load model into GPU VRAM at startup so the first real query isn't slow."""
     print(f"[llm] Warming up '{OLLAMA_MODEL}'…")
     try:
         async with httpx.AsyncClient(timeout=240.0) as client:
@@ -120,5 +114,4 @@ generate_with_fallback = generate_with_ollama
 
 
 async def generate_text(system_prompt: str, user_message: str) -> tuple[str, str]:
-    """Free-text (non-JSON) response — used by result_summarizer.py."""
     return await generate_with_ollama(system_prompt, user_message, json_mode=False)

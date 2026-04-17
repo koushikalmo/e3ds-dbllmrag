@@ -1,6 +1,3 @@
-# main.py — FastAPI app entry point
-# Routes: GET / | GET /api/health | GET /api/status | POST /api/query | POST /api/analyze
-
 import os
 import time
 import asyncio
@@ -28,6 +25,8 @@ from lib.chat_sharing       import create_share, get_share
 from lib.query_examples     import index_all_examples_async
 from lib.session_memory     import add_turn, get_context_text, clear_session, active_session_count
 from lib.collection_resolver import resolve_and_log
+from lib.response_validator import validate_query_and_result
+from lib.feedback_store     import save_feedback, get_feedback_stats
 
 
 @asynccontextmanager
@@ -43,7 +42,6 @@ async def lifespan(app: FastAPI):
     print(f"  RAG examples: {get_example_count()} in store")
     print("═" * 56)
 
-    # All four startup tasks run concurrently in the background
     asyncio.create_task(warmup_model())
     asyncio.create_task(warm_all_caches(default_collection))
     asyncio.create_task(refresh_schema_cache(stream_collection=default_collection))
@@ -65,14 +63,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins = ["*"],
-    allow_methods = ["GET", "POST"],
+    allow_methods = ["GET", "POST", "DELETE"],
     allow_headers = ["*"],
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
-# ── Request models ─────────────────────────────────────────────
 
 class QueryRequest(BaseModel):
     question:   str = Field(..., min_length=1, max_length=500)
@@ -90,7 +86,15 @@ class AnalyzeRequest(BaseModel):
     question: str  = Field(..., min_length=1, max_length=500)
 
 
-# ── Routes ─────────────────────────────────────────────────────
+class FeedbackRequest(BaseModel):
+    session_id:         str  = Field("",  description="Frontend session UUID")
+    question:           str  = Field(..., min_length=1, max_length=500)
+    query_meta:         dict = Field({},  description="Query metadata returned by /api/query")
+    result_count:       int  = Field(0,   ge=0)
+    rating:             str  = Field(..., description="'good' or 'bad'")
+    correction_note:    str  = Field("",  max_length=2000)
+    corrected_pipeline: list = Field([],  description="User-supplied corrected pipeline JSON")
+
 
 @app.get("/", include_in_schema=False)
 async def serve_frontend():
@@ -99,16 +103,18 @@ async def serve_frontend():
 
 @app.get("/api/health")
 async def health_check():
-    db_status = await ping_databases()
-    all_ok    = all(v == "ok" for v in db_status.values())
+    db_status      = await ping_databases()
+    all_ok         = all(v == "ok" for v in db_status.values())
+    feedback_stats = await get_feedback_stats()
     return JSONResponse(
         content={
-            "status":       "ok" if all_ok else "degraded",
-            "databases":    db_status,
-            "schema_cache": get_cache_status(),
-            "live_context": get_live_cache_status(),
-            "rag_examples": get_example_count(),
-            "time":         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "status":        "ok" if all_ok else "degraded",
+            "databases":     db_status,
+            "schema_cache":  get_cache_status(),
+            "live_context":  get_live_cache_status(),
+            "rag_examples":  get_example_count(),
+            "feedback":      feedback_stats,
+            "time":          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         },
         status_code=200 if all_ok else 503,
     )
@@ -130,7 +136,6 @@ async def llm_status():
 
 @app.post("/api/query")
 async def run_query(body: QueryRequest):
-    """NL question → MongoDB pipeline → results + AI summary."""
     start = time.perf_counter()
 
     try:
@@ -145,7 +150,6 @@ async def run_query(body: QueryRequest):
         )
         result = await execute_query(query_obj)
 
-        # Auto-analyze results immediately
         rows_for_analysis = result.get("results", [])
         if isinstance(rows_for_analysis, dict):
             rows_for_analysis = rows_for_analysis.get("merged") or rows_for_analysis.get("primary") or []
@@ -191,6 +195,26 @@ async def run_query(body: QueryRequest):
             if isinstance(primary, dict):
                 result_count = len(primary.get("primary", []))
 
+        validation_warnings = validate_query_and_result(query_obj, result, result_count)
+
+        # Extract LLM transparency fields (may be absent on old Ollama builds)
+        assumptions = query_obj.get("assumptions", [])
+        if not isinstance(assumptions, list):
+            assumptions = []
+        confidence = query_obj.get("confidence", "medium")
+        if confidence not in ("high", "medium", "low"):
+            confidence = "medium"
+
+        # Build a lightweight query-metadata object the frontend sends back for feedback
+        query_meta = {
+            "queryType":  query_obj.get("queryType"),
+            "database":   query_obj.get("database"),
+            "collection": query_obj.get("collection"),
+            "operation":  query_obj.get("operation", "aggregate"),
+            "pipeline":   query_obj.get("pipeline"),
+            "queries":    query_obj.get("queries"),
+        }
+
         if result_count > 0:
             if body.session_id:
                 add_turn(
@@ -213,9 +237,13 @@ async def run_query(body: QueryRequest):
             "success": True,
             "data": {
                 **result,
-                "aiSummary":   ai_summary,
-                "explanation": query_obj.get("explanation", ""),
-                "queryPlan":   query_plan,
+                "aiSummary":         ai_summary,
+                "explanation":       query_obj.get("explanation", ""),
+                "queryPlan":         query_plan,
+                "assumptions":       assumptions,
+                "confidence":        confidence,
+                "validationWarnings": validation_warnings,
+                "queryMeta":         query_meta,
                 "meta": {
                     "question":       body.question.strip(),
                     "collectionUsed": collection,
@@ -237,7 +265,6 @@ async def run_query(body: QueryRequest):
 
 @app.post("/api/analyze")
 async def analyze_results(body: AnalyzeRequest):
-    """AI analysis of an existing result set. Uses chunked map-reduce for large sets."""
     start = time.perf_counter()
 
     if not body.results:
@@ -283,7 +310,6 @@ async def clear_history():
 
 @app.post("/api/schema/refresh")
 async def refresh_schema():
-    """Force-refresh all data caches (schema discovery + live context)."""
     collection = os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2026")
     await asyncio.gather(
         refresh_schema_cache(stream_collection=collection, force=True),
@@ -296,9 +322,37 @@ async def refresh_schema():
     })
 
 
+@app.post("/api/feedback")
+async def submit_feedback(body: FeedbackRequest):
+    if body.rating not in ("good", "bad"):
+        return JSONResponse(
+            content={"success": False, "error": "rating must be 'good' or 'bad'"},
+            status_code=400,
+        )
+    try:
+        doc_id = await save_feedback(
+            session_id         = body.session_id,
+            question           = body.question,
+            query_obj          = body.query_meta,
+            result_count       = body.result_count,
+            rating             = body.rating,
+            correction_note    = body.correction_note,
+            corrected_pipeline = body.corrected_pipeline,
+        )
+        return JSONResponse(content={"success": True, "id": doc_id})
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"[/api/feedback] Error:\n{traceback.format_exc()}")
+        return JSONResponse(
+            content={"success": False, "error": f"Failed to save feedback: {str(e)[:200]}"},
+            status_code=500,
+        )
+
+
 @app.post("/api/share")
 async def share_chat(body: ShareRequest):
-    """Save a chat snapshot and return a shareable ID."""
     try:
         share_id = await create_share(body.turns, body.title)
         return JSONResponse(content={"success": True, "share_id": share_id})

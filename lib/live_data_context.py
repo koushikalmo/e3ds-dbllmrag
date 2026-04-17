@@ -1,7 +1,3 @@
-# lib/live_data_context.py — Caches real MongoDB values for LLM prompt injection
-# Prevents the LLM from guessing field values ("brasil" vs "Brazil") or inventing owner names.
-# Four things cached: document samples, categorical values, collection list, owner list.
-
 import re
 import json
 import time
@@ -67,7 +63,6 @@ _refresh_tasks: set[str] = set()
 
 
 def _slim_doc(doc: dict) -> dict:
-    """Keep only query-relevant fields from a raw session document."""
     result = {}
     for key, val in doc.items():
         if key in _STRIP_TOP:
@@ -116,7 +111,6 @@ async def _sample_documents(collection: str) -> list[dict]:
 
 
 async def _top_values(collection: str, field_path: str, top_n: int) -> list[str]:
-    """Top N most frequent non-null values for a field, sorted by frequency."""
     db    = get_stream_db()
     match = {"e3ds_employee": {"$ne": True}, field_path: {"$exists": True, "$nin": [None, "", "null"]}}
     try:
@@ -134,7 +128,6 @@ async def _top_values(collection: str, field_path: str, top_n: int) -> list[str]
 
 
 async def _fetch_collection_list() -> list[str]:
-    """All Month_Year stream collections sorted newest-first."""
     _PAT = re.compile(r"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)_(\d{4})$")
     _MON = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,"Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
     db = get_stream_db()
@@ -149,7 +142,6 @@ async def _fetch_collection_list() -> list[str]:
 
 
 async def _fetch_appconfigs_owners() -> list[str]:
-    """Fallback list of appConfigs collection names (= owner usernames)."""
     _SKIP = frozenset({"system.indexes", "system.users", "system.version"})
     db = get_appconfigs_db()
     try:
@@ -169,7 +161,6 @@ async def _populate_docs(collection: str) -> None:
 
 
 async def _populate_values(collection: str) -> None:
-    """Run 6 aggregation queries concurrently to fetch categorical value lists."""
     cache   = _collection_cache.setdefault(collection, _CollectionData())
     results = await asyncio.gather(
         _top_values(collection, "clientInfo.country_name",    _N_COUNTRY),
@@ -216,7 +207,6 @@ def _global_stale() -> bool:
 
 
 async def _bg_refresh(collection: str) -> None:
-    """Refresh only stale entries. Skips keys already being refreshed."""
     to_run: dict[str, Any] = {}
 
     if _global_stale() and "globals" not in _refresh_tasks:
@@ -238,11 +228,10 @@ async def _bg_refresh(collection: str) -> None:
     try:
         await asyncio.gather(*to_run.values(), return_exceptions=True)
     finally:
-        _refresh_tasks -= to_run.keys()
+        _refresh_tasks.difference_update(to_run.keys())
 
 
 async def warm_all_caches(collection: str) -> None:
-    """Pre-populate all caches at startup."""
     logger.info(f"[live_ctx] Warming caches for {collection}…")
     start = time.monotonic()
     await asyncio.gather(_populate_globals(), _populate_docs(collection), _populate_values(collection), return_exceptions=True)
@@ -250,7 +239,6 @@ async def warm_all_caches(collection: str) -> None:
 
 
 async def get_live_context(collection: str, question: str = "") -> str:
-    """Returns a formatted context block for injection into the LLM prompt."""
     cache = _collection_cache.get(collection)
 
     if cache is None:
@@ -264,7 +252,6 @@ async def get_live_context(collection: str, question: str = "") -> str:
             logger.warning(f"[live_ctx] Cold-start timed out for {collection}")
         cache = _collection_cache.get(collection)
     else:
-        # Serve cached data, refresh stale entries in background
         asyncio.create_task(_bg_refresh(collection))
 
     if not cache or (not cache.documents and not cache.countries):

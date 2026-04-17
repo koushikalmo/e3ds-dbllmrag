@@ -1,7 +1,3 @@
-# lib/query_examples.py — RAG few-shot example store
-# Saves successful queries and retrieves similar ones to prepend to LLM prompts.
-# Primary search: semantic vector similarity. Fallback: keyword overlap.
-
 import os
 import json
 import logging
@@ -211,7 +207,6 @@ def _tokenize(text: str) -> set[str]:
 
 
 async def find_similar_examples_vector(question: str, db_hint: str = "stream", top_n: int = TOP_N) -> list[dict] | None:
-    """Semantic search via embeddings. Returns None if embedding model is unavailable."""
     from lib.embeddings   import embed
     from lib.vector_store import VectorStore
 
@@ -227,19 +222,31 @@ async def find_similar_examples_vector(question: str, db_hint: str = "stream", t
         hint = item["metadata"].get("db_hint", "stream")
         return hint == db_hint or hint == "both" or db_hint == "both"
 
-    results = store.search(q_emb, top_k=top_n, filter_fn=_filter, min_score=0.4)
-    if not results:
+    # wider pool so high-weight items can surface past lower-scoring but newer ones
+    candidates = store.search(q_emb, top_k=top_n * 4, filter_fn=_filter, min_score=0.3)
+    if not candidates:
         return None
 
+    weighted = sorted(
+        candidates,
+        key=lambda r: r["score"] * r["metadata"].get("weight", 1.0),
+        reverse=True,
+    )
+    top_results = weighted[:top_n]
+
     return [
-        {"question": r["text"], "query": r["metadata"].get("query", {}),
-         "result_count": r["metadata"].get("result_count", 0), "db_hint": r["metadata"].get("db_hint", "stream")}
-        for r in results
+        {
+            "question":     r["text"],
+            "query":        r["metadata"].get("query", {}),
+            "result_count": r["metadata"].get("result_count", 0),
+            "db_hint":      r["metadata"].get("db_hint", "stream"),
+            "weight":       r["metadata"].get("weight", 1.0),
+        }
+        for r in top_results
     ]
 
 
 def find_similar_examples(question: str, db_hint: str = "stream", top_n: int = TOP_N) -> list[dict]:
-    """Keyword overlap fallback when vector search is unavailable."""
     examples      = _load_examples()
     question_words = _tokenize(question)
     if not examples or not question_words:
@@ -261,7 +268,6 @@ def find_similar_examples(question: str, db_hint: str = "stream", top_n: int = T
 
 
 def add_example(question: str, query_obj: dict, result_count: int, db_hint: str = "stream") -> None:
-    """Save a successful query as a future few-shot example. Skips 0-result queries and near-duplicates."""
     if result_count == 0:
         return
 
@@ -269,7 +275,7 @@ def add_example(question: str, query_obj: dict, result_count: int, db_hint: str 
     if existing:
         similarity = len(_tokenize(question) & _tokenize(existing[0].get("question", ""))) / max(len(_tokenize(question)), 1)
         if similarity > 0.85:
-            return  # near-duplicate already stored
+            return
 
     new_example = {
         "question": question, "query": query_obj,
@@ -285,8 +291,14 @@ def add_example(question: str, query_obj: dict, result_count: int, db_hint: str 
     asyncio.create_task(_index_example_async(question, query_obj, result_count, db_hint))
 
 
-async def _index_example_async(question: str, query_obj: dict, result_count: int, db_hint: str) -> None:
-    """Background task: embed question and store in vector store for semantic search."""
+async def _index_example_async(
+    question:     str,
+    query_obj:    dict,
+    result_count: int,
+    db_hint:      str,
+    weight:       float = 1.0,  # 1.0=auto, 2.0=user verified, 2.5=user corrected
+    source:       str   = "auto",
+) -> None:
     import hashlib
     from lib.embeddings   import embed
     from lib.vector_store import VectorStore
@@ -297,16 +309,21 @@ async def _index_example_async(question: str, query_obj: dict, result_count: int
 
     store = VectorStore("examples")
     store.upsert(
-        id       = hashlib.sha1(question.encode()).hexdigest(),
-        text     = question,
-        embedding= emb,
-        metadata = {"query": query_obj, "result_count": result_count, "db_hint": db_hint},
+        id        = hashlib.sha1(question.encode()).hexdigest(),
+        text      = question,
+        embedding = emb,
+        metadata  = {
+            "query":        query_obj,
+            "result_count": result_count,
+            "db_hint":      db_hint,
+            "weight":       weight,
+            "source":       source,
+        },
     )
     store.trim_to(MAX_EXAMPLES)
 
 
 def format_examples_for_prompt(examples: list[dict]) -> str:
-    """Format retrieved examples as a few-shot block for the LLM prompt."""
     if not examples:
         return ""
 
@@ -332,12 +349,48 @@ def format_examples_for_prompt(examples: list[dict]) -> str:
     return "\n".join(lines)
 
 
+async def add_verified_example(question: str, query_obj: dict, result_count: int, db_hint: str = "stream") -> None:
+    _update_example_weight_in_file(question, 2.0)
+    await _index_example_async(question, query_obj, result_count, db_hint, weight=2.0, source="user_verified")
+
+
+async def add_corrected_example(question: str, query_obj: dict, result_count: int, db_hint: str = "stream") -> None:
+    new_example = {
+        "question":     question,
+        "query":        query_obj,
+        "result_count": result_count,
+        "timestamp":    datetime.now(timezone.utc).isoformat(),
+        "db_hint":      db_hint,
+        "weight":       2.5,
+        "source":       "user_corrected",
+    }
+    examples = _load_examples()
+    # Replace existing entry for this question if present
+    examples = [e for e in examples if _tokenize(e.get("question", "")) != _tokenize(question)]
+    examples.insert(0, new_example)
+    _save_examples(examples)
+    await _index_example_async(question, query_obj, result_count, db_hint, weight=2.5, source="user_corrected")
+
+
+def _update_example_weight_in_file(question: str, weight: float) -> None:
+    q_tokens = _tokenize(question)
+    examples = _load_examples()
+    changed = False
+    for ex in examples:
+        if _tokenize(ex.get("question", "")) == q_tokens:
+            ex["weight"] = weight
+            ex["source"] = "user_verified"
+            changed = True
+            break
+    if changed:
+        _save_examples(examples)
+
+
 def get_example_count() -> int:
     return len(_load_examples())
 
 
 async def index_all_examples_async() -> int:
-    """Index all examples into the vector store on startup."""
     import hashlib
     from lib.embeddings   import embed
     from lib.vector_store import VectorStore
@@ -360,10 +413,16 @@ async def index_all_examples_async() -> int:
         if emb is None:
             break
         store.upsert(
-            id       = item_id,
-            text     = question,
-            embedding= emb,
-            metadata = {"query": ex.get("query", {}), "result_count": ex.get("result_count", 0), "db_hint": ex.get("db_hint", "stream")},
+            id        = item_id,
+            text      = question,
+            embedding = emb,
+            metadata  = {
+                "query":        ex.get("query", {}),
+                "result_count": ex.get("result_count", 0),
+                "db_hint":      ex.get("db_hint", "stream"),
+                "weight":       ex.get("weight", 1.0),
+                "source":       ex.get("source", "auto"),
+            },
         )
         indexed += 1
 

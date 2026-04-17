@@ -526,6 +526,125 @@
     @media (max-width: 420px) {
       .logo-text { display: none; }
     }
+
+    /* ── Assumptions badge ───────────────────────────────────── */
+    .assumptions-badge {
+      background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px;
+      padding: .55rem .875rem; margin-bottom: .5rem;
+    }
+    .assumptions-title {
+      font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+      color: #b45309; font-weight: 700; margin-bottom: .35rem;
+    }
+    .assumptions-list { list-style: none; padding: 0; margin: 0; }
+    .assumptions-list li {
+      font-size: 11px; color: #92400e; padding: 1px 0; line-height: 1.5;
+    }
+    .assumptions-list li::before { content: "→ "; font-weight: 700; }
+
+    /* ── Validation warning badges (above toggle) ────────────── */
+    .val-warnings-outer { margin-bottom: .5rem; }
+    .val-warning-badge {
+      display: flex; align-items: flex-start; gap: .5rem;
+      padding: .4rem .75rem; border-radius: 5px;
+      font-size: 11px; margin-bottom: .3rem; line-height: 1.5;
+    }
+    .val-warning-badge.warning { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+    .val-warning-badge.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+    .val-warning-badge-icon { flex-shrink: 0; font-weight: 700; }
+
+    /* ── Feedback bar ────────────────────────────────────────── */
+    .feedback-bar {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .35rem 0 .65rem; flex-wrap: wrap;
+    }
+    .feedback-label { font-size: 10px; color: var(--dimmer); letter-spacing: .06em; flex-shrink: 0; }
+    .btn-feedback {
+      padding: 5px 14px; border-radius: 6px; font-family: var(--mono);
+      font-size: 11px; cursor: pointer; border: 1px solid var(--border2);
+      transition: all .15s; background: var(--bg2); color: var(--dim);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .btn-feedback:hover:not(:disabled) { background: var(--bg3); border-color: var(--border2); }
+    .btn-feedback.good:hover:not(:disabled) { border-color: var(--green); color: var(--green); background: #f0fdf4; }
+    .btn-feedback.bad:hover:not(:disabled)  { border-color: var(--red);   color: var(--red);   background: #fef2f2; }
+    .btn-feedback.selected-good { border-color: var(--green); color: var(--green); background: #f0fdf4; font-weight: 700; }
+    .btn-feedback.selected-bad  { border-color: var(--red);   color: var(--red);   background: #fef2f2; font-weight: 700; }
+    .btn-feedback:disabled { opacity: .5; cursor: default; }
+    .feedback-status { font-size: 10px; padding: 4px 8px; border-radius: 4px; }
+    .feedback-status.ok  { color: var(--green); background: #f0fdf4; }
+    .feedback-status.err { color: var(--red);   background: #fef2f2; }
+
+    /* ── Correction form ─────────────────────────────────────── */
+    .correction-form {
+      margin-top: .4rem; padding: .75rem; background: var(--bg2);
+      border: 1px solid var(--border2); border-radius: 6px;
+      display: flex; flex-direction: column; gap: .5rem;
+      animation: fadeUp .15s ease;
+    }
+    .correction-form-label { font-size: 10px; color: var(--dim); font-weight: 700; letter-spacing: .04em; }
+    .correction-form textarea {
+      background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 5px; padding: .5rem .75rem; font-family: var(--mono);
+      font-size: 11px; color: var(--text); resize: vertical; min-height: 52px;
+      outline: none; transition: border-color .15s;
+    }
+    .correction-form textarea:focus { border-color: var(--accent); }
+    .correction-form-actions { display: flex; gap: .5rem; justify-content: flex-end; flex-wrap: wrap; }
+    .btn-correction-submit {
+      background: var(--accent); color: #fff; border: none; border-radius: 5px;
+      padding: 5px 14px; font-family: var(--mono); font-size: 11px; font-weight: 700;
+      cursor: pointer; transition: background .15s; letter-spacing: .04em;
+    }
+    .btn-correction-submit:hover:not(:disabled) { background: #bf5200; }
+    .btn-correction-submit:disabled { background: var(--border2); color: var(--dim); cursor: default; }
+    .btn-correction-cancel {
+      background: none; border: 1px solid var(--border2); color: var(--dim);
+      border-radius: 5px; padding: 5px 10px; font-family: var(--mono);
+      font-size: 11px; cursor: pointer; transition: all .15s;
+    }
+    .btn-correction-cancel:hover { background: var(--bg3); }
+
+    /* ── VALIDATION tab view ─────────────────────────────────── */
+    .validation-view {
+      padding: 1rem 1.25rem; overflow-y: auto; max-height: 420px;
+      display: flex; flex-direction: column; gap: 1.1rem;
+    }
+    .val-section-title {
+      font-size: 9px; letter-spacing: .12em; color: var(--accent);
+      font-weight: 700; margin-bottom: .5rem; text-transform: uppercase;
+    }
+    .val-confidence {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    }
+    .val-confidence.high   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+    .val-confidence.medium { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
+    .val-confidence.low    { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+    .val-check-row {
+      display: flex; align-items: flex-start; gap: .5rem;
+      padding: .4rem .6rem; border-radius: 5px; font-size: 11px;
+      margin-bottom: .3rem; line-height: 1.55;
+    }
+    .val-check-row.pass    { color: #166534; background: #f0fdf4; }
+    .val-check-row.warning { color: #92400e; background: #fffbeb; }
+    .val-check-row.error   { color: #991b1b; background: #fef2f2; }
+    .val-check-row.info    { color: #1e40af; background: #eff6ff; }
+    .val-check-icon        { flex-shrink: 0; font-size: 12px; font-weight: 700; }
+    .val-assumption-row {
+      display: flex; align-items: flex-start; gap: .5rem;
+      font-size: 11px; color: var(--text); padding: .3rem 0;
+      border-bottom: 1px solid var(--border); line-height: 1.5;
+    }
+    .val-assumption-row:last-child { border-bottom: none; }
+    .val-assumption-arrow { color: var(--accent); flex-shrink: 0; font-weight: 700; }
+    .val-empty { font-size: 11px; color: var(--dimmer); font-style: italic; }
+
+    @media (max-width: 768px) {
+      .validation-view { padding: .75rem; max-height: 360px; }
+      .correction-form { padding: .6rem; }
+      .btn-feedback { padding: 6px 12px; }
+    }
   </style>
 </head>
 <body>
@@ -658,7 +777,7 @@ const PAGE_SIZE = 25;
 
 function randomUUID() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return randomUUID();
+    return crypto.randomUUID();
   }
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0;
@@ -1050,7 +1169,35 @@ function buildResultCard(data) {
     wrapper.appendChild(empty);
   }
 
-  // 2. Collapsible raw data
+  // 2. Assumptions badge — always visible, only if LLM declared assumptions
+  const assumptions = data.assumptions || [];
+  if (assumptions.length > 0) {
+    const badge = document.createElement("div");
+    badge.className = "assumptions-badge";
+    let html = `<div class="assumptions-title">AI Assumptions (${assumptions.length})</div><ul class="assumptions-list">`;
+    assumptions.forEach(a => { html += `<li>${escHtml(a)}</li>`; });
+    html += "</ul>";
+    badge.innerHTML = html;
+    wrapper.appendChild(badge);
+  }
+
+  // 3. Visible warning/error badges (above toggle, so user sees them without opening Raw Data)
+  const criticalWarnings = (data.validationWarnings || []).filter(
+    w => w.level === "error" || w.level === "warning"
+  );
+  if (criticalWarnings.length > 0) {
+    const outer = document.createElement("div");
+    outer.className = "val-warnings-outer";
+    criticalWarnings.forEach(w => {
+      const b = document.createElement("div");
+      b.className = `val-warning-badge ${w.level}`;
+      b.innerHTML = `<span class="val-warning-badge-icon">${w.level === "error" ? "✗" : "⚠"}</span><span>${escHtml(w.message)}</span>`;
+      outer.appendChild(b);
+    });
+    wrapper.appendChild(outer);
+  }
+
+  // 4. Collapsible raw data
   const toggle = document.createElement("button");
   toggle.className = "raw-data-toggle";
   toggle.innerHTML = `<span class="toggle-arrow">▶</span> Raw Data (${count} result${count !== 1 ? "s" : ""})`;
@@ -1064,7 +1211,7 @@ function buildResultCard(data) {
   card.className = "result-card";
   rawSection.appendChild(card);
 
-  const state = { rows, page: 1, view: "table", data };
+  const state = { rows, page: 1, view: "table", data, feedbackRating: null };
   msgState.set(card, state);
 
   // Card header with 6 tabs
@@ -1083,6 +1230,7 @@ function buildResultCard(data) {
         <button class="tab-btn"        data-view="plan">PLAN</button>
         <button class="tab-btn"        data-view="dataview">DATA</button>
         <button class="tab-btn"        data-view="steps">STEPS</button>
+        <button class="tab-btn"        data-view="validation">VALIDATION</button>
       </div>
     </div>
   `;
@@ -1182,6 +1330,9 @@ function renderCardBody(card) {
   } else if (state.view === "steps") {
     pageBar.style.display = "none";
     renderStepsView(body, data);
+  } else if (state.view === "validation") {
+    pageBar.style.display = "none";
+    renderValidationView(body, state);
   }
 }
 
@@ -1773,6 +1924,206 @@ function stopVoiceUI() {
   voiceBtn.classList.remove("active");
   listeningHint.style.display = "none";
   inputWrap.classList.remove("listening");
+}
+
+
+// ── VALIDATION tab view ───────────────────────────────────────
+function renderValidationView(body, state) {
+  const data        = state.data;
+  const confidence  = data.confidence  || "medium";
+  const assumptions = data.assumptions || [];
+  const warnings    = data.validationWarnings || [];
+  const question    = data.meta?.question || "";
+  const queryMeta   = data.queryMeta   || {};
+  const resultCount = data.queryType === "dual"
+    ? (data.summary?.primary?.count ?? 0)
+    : (data.summary?.count ?? 0);
+
+  const view = document.createElement("div");
+  view.className = "validation-view";
+
+  // ── Confidence ──────────────────────────────────────────────
+  const confLabels = {
+    high:   "HIGH — confident this query is correct",
+    medium: "MEDIUM — minor assumptions were made",
+    low:    "LOW — this query may need review",
+  };
+  const confIcons = { high: "●", medium: "◐", low: "○" };
+  const confSec = document.createElement("div");
+  confSec.innerHTML = `
+    <div class="val-section-title">AI Confidence</div>
+    <span class="val-confidence ${confidence}">
+      <span>${confIcons[confidence] || "◐"}</span>
+      ${escHtml(confLabels[confidence] || confidence.toUpperCase())}
+    </span>`;
+  view.appendChild(confSec);
+
+  // ── Assumptions ─────────────────────────────────────────────
+  const assumpSec = document.createElement("div");
+  let assumpHtml = `<div class="val-section-title">Assumptions Made (${assumptions.length})</div>`;
+  if (assumptions.length > 0) {
+    assumptions.forEach(a => {
+      assumpHtml += `<div class="val-assumption-row">
+        <span class="val-assumption-arrow">→</span>
+        <span>${escHtml(a)}</span>
+      </div>`;
+    });
+  } else {
+    assumpHtml += `<div class="val-empty">No assumptions declared — question was unambiguous.</div>`;
+  }
+  assumpSec.innerHTML = assumpHtml;
+  view.appendChild(assumpSec);
+
+  // ── Automated checks ────────────────────────────────────────
+  const checkSec = document.createElement("div");
+  const icons    = { pass: "✓", warning: "⚠", error: "✗", info: "ℹ" };
+  let checkHtml  = `<div class="val-section-title">Automated Checks (${warnings.length})</div>`;
+  if (warnings.length > 0) {
+    warnings.forEach(w => {
+      checkHtml += `<div class="val-check-row ${w.level}">
+        <span class="val-check-icon">${icons[w.level] || "·"}</span>
+        <span>${escHtml(w.message)}</span>
+      </div>`;
+    });
+  } else {
+    checkHtml += `<div class="val-empty">No validation data available.</div>`;
+  }
+  checkSec.innerHTML = checkHtml;
+  view.appendChild(checkSec);
+
+  // ── Feedback / rating ────────────────────────────────────────
+  view.appendChild(buildFeedbackSection(state, question, queryMeta, resultCount));
+
+  body.appendChild(view);
+}
+
+
+// ── Feedback section (inside VALIDATION tab) ──────────────────
+function buildFeedbackSection(state, question, queryMeta, resultCount) {
+  const section = document.createElement("div");
+  section.innerHTML = `<div class="val-section-title">Rate This Response</div>`;
+
+  // Already rated? Show status only.
+  if (state.feedbackRating) {
+    const done = document.createElement("div");
+    done.style.cssText = "font-size:11px;padding:.35rem 0;";
+    done.innerHTML = state.feedbackRating === "good"
+      ? `<span style="color:var(--green);font-weight:700">✓ Marked as correct</span> — thank you!`
+      : `<span style="color:var(--red);font-weight:700">✓ Feedback submitted</span> — thank you!`;
+    section.appendChild(done);
+    return section;
+  }
+
+  // Feedback bar
+  const bar = document.createElement("div");
+  bar.className = "feedback-bar";
+  bar.innerHTML = `
+    <span class="feedback-label">Was this response correct?</span>
+    <button class="btn-feedback good">👍 Correct</button>
+    <button class="btn-feedback bad">👎 Wrong</button>
+    <span class="feedback-status" style="display:none"></span>`;
+  section.appendChild(bar);
+
+  // Correction form (hidden until 👎 is clicked)
+  const form = document.createElement("div");
+  form.className = "correction-form";
+  form.style.display = "none";
+  form.innerHTML = `
+    <div class="correction-form-label">What was wrong? (optional)</div>
+    <textarea class="correction-note" placeholder="Describe what the AI got wrong or what you expected…" rows="2"></textarea>
+    <div class="correction-form-label">Corrected pipeline JSON (optional)</div>
+    <textarea class="correction-pipeline" placeholder='[{"$match": {...}}, {"$group": {...}}]' rows="3" spellcheck="false"></textarea>
+    <div class="correction-form-actions">
+      <button class="btn-correction-cancel">Cancel</button>
+      <button class="btn-correction-submit">Submit Correction</button>
+    </div>`;
+  section.appendChild(form);
+
+  const goodBtn   = bar.querySelector(".btn-feedback.good");
+  const badBtn    = bar.querySelector(".btn-feedback.bad");
+  const statusEl  = bar.querySelector(".feedback-status");
+
+  async function lockAndShow(rating, message, isOk) {
+    goodBtn.disabled = true;
+    badBtn.disabled  = true;
+    form.style.display = "none";
+    statusEl.style.display = "inline";
+    statusEl.className = `feedback-status ${isOk ? "ok" : "err"}`;
+    statusEl.textContent = message;
+    state.feedbackRating = rating;
+  }
+
+  goodBtn.addEventListener("click", async () => {
+    goodBtn.classList.add("selected-good");
+    statusEl.style.display = "inline";
+    statusEl.className = "feedback-status";
+    statusEl.textContent = "Submitting…";
+    const ok = await submitFeedback(question, queryMeta, resultCount, "good", "", []);
+    lockAndShow("good",
+      ok ? "✓ Marked as correct — used to improve future answers" : "⚠ Could not save (server error)",
+      ok
+    );
+  });
+
+  badBtn.addEventListener("click", () => {
+    badBtn.classList.add("selected-bad");
+    goodBtn.classList.remove("selected-good");
+    statusEl.style.display = "none";
+    form.style.display = "flex";
+    form.querySelector(".correction-note").focus();
+  });
+
+  form.querySelector(".btn-correction-cancel").addEventListener("click", () => {
+    form.style.display = "none";
+    badBtn.classList.remove("selected-bad");
+  });
+
+  form.querySelector(".btn-correction-submit").addEventListener("click", async () => {
+    const note     = form.querySelector(".correction-note").value.trim();
+    const pipeText = form.querySelector(".correction-pipeline").value.trim();
+    let correctedPipeline = [];
+    if (pipeText) {
+      try { correctedPipeline = JSON.parse(pipeText); }
+      catch { alert("Invalid JSON in corrected pipeline — check brackets and quotes."); return; }
+      if (!Array.isArray(correctedPipeline)) {
+        alert("Corrected pipeline must be a JSON array: [ {...}, {...} ]"); return;
+      }
+    }
+    const submitBtn = form.querySelector(".btn-correction-submit");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Submitting…";
+    const ok = await submitFeedback(question, queryMeta, resultCount, "bad", note, correctedPipeline);
+    lockAndShow("bad_corrected",
+      ok ? "✓ Correction submitted — will be used as a training example" : "⚠ Could not save (server error)",
+      ok
+    );
+  });
+
+  return section;
+}
+
+
+// ── Submit feedback to /api/feedback ─────────────────────────
+async function submitFeedback(question, queryMeta, resultCount, rating, correctionNote, correctedPipeline) {
+  try {
+    const res = await fetch("/api/feedback", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        session_id:         SESSION_ID,
+        question:           question,
+        query_meta:         queryMeta,
+        result_count:       resultCount,
+        rating:             rating,
+        correction_note:    correctionNote,
+        corrected_pipeline: correctedPipeline,
+      }),
+    });
+    const data = await res.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
 }
 
 

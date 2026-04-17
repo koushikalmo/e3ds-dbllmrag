@@ -1,6 +1,3 @@
-# lib/db_registry.py — Config-driven multi-database registry
-# Add a new database: add URI to .env + add entry to data/db_registry.json + restart.
-
 import os
 import json
 import logging
@@ -39,7 +36,6 @@ def get_registry_entry(db_name: str) -> dict | None:
 
 
 def get_db(db_name: str) -> AsyncIOMotorDatabase:
-    """Returns the Motor database handle for a registered database (lazy init)."""
     entry = get_registry_entry(db_name)
     if entry is None:
         raise ValueError(

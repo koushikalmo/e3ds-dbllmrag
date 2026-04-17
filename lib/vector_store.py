@@ -1,6 +1,3 @@
-# lib/vector_store.py — Local JSON-backed vector store with cosine similarity search
-# Two stores used: data/vectors/schema.json (field descriptions) and examples.json (past queries)
-
 import json
 import math
 import logging
@@ -12,7 +9,7 @@ _STORE_DIR = Path(__file__).parent.parent / "data" / "vectors"
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
-    """Cosine similarity in pure Python — ~5ms for 500×768-dim items."""
+    # pure Python — ~5ms for 500×768-dim items, acceptable for small RAG stores
     if not a or not b or len(a) != len(b):
         return 0.0
     dot   = sum(x * y for x, y in zip(a, b))
@@ -24,8 +21,6 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 class VectorStore:
-    """Local vector store backed by a single JSON file at data/vectors/{name}.json."""
-
     def __init__(self, name: str):
         self._path  = _STORE_DIR / f"{name}.json"
         self._items: list[dict] = []
@@ -77,7 +72,6 @@ class VectorStore:
         return False
 
     def trim_to(self, max_items: int) -> int:
-        """Drop oldest items (index 0) until store is at most max_items."""
         if len(self._items) <= max_items:
             return 0
         removed = len(self._items) - max_items
@@ -92,7 +86,6 @@ class VectorStore:
         filter_fn               = None,
         min_score:       float = 0.0,
     ) -> list[dict]:
-        """Returns top_k items sorted by cosine similarity descending."""
         candidates = [
             i for i in self._items
             if i.get("embedding") and (filter_fn is None or filter_fn(i))

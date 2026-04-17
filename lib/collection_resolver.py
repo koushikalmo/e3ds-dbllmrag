@@ -1,6 +1,3 @@
-# lib/collection_resolver.py — Parses month/year from a question, returns MongoDB collection name
-# Runs before the LLM so the correct collection is set before the prompt is built.
-
 import re
 import os
 from datetime import datetime, timezone, timedelta
@@ -42,7 +39,6 @@ def _default_year(default_collection: str) -> int:
 
 
 def resolve_collection(question: str, default_collection: str) -> str:
-    """Detects a month/year reference in the question. Returns the matching collection name."""
     q     = question.strip()
     now   = datetime.now(timezone.utc)
     lower = q.lower()

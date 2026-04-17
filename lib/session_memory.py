@@ -1,22 +1,18 @@
-# lib/session_memory.py — Short-term in-memory conversation history per session
-# Stores last MAX_TURNS exchanges so follow-up questions ("filter those to Europe") work.
-# No persistence — cleared on server restart or new session UUID.
-
 import time
 import logging
 from collections import deque
 
 logger = logging.getLogger(__name__)
 
-MAX_TURNS   = 10    # last 10 exchanges ≈ 500 tokens — fits in 8K context
-SESSION_TTL = 7200  # seconds before an idle session is garbage-collected
+# 10 exchanges ≈ 500 tokens — keeps follow-up context without blowing the 8K context window
+MAX_TURNS   = 10
+SESSION_TTL = 7200  # 2 hours — sessions idle past this are GC'd
 
 # { session_id: { "messages": deque, "last_active": float } }
 _sessions: dict[str, dict] = {}
 
 
 def _gc() -> None:
-    """Remove sessions idle longer than SESSION_TTL."""
     cutoff  = time.monotonic() - SESSION_TTL
     expired = [sid for sid, s in _sessions.items() if s["last_active"] < cutoff]
     for sid in expired:
@@ -24,7 +20,6 @@ def _gc() -> None:
 
 
 def add_turn(session_id: str, question: str, answer: str) -> None:
-    """Record one completed exchange (question + answer summary)."""
     if not session_id:
         return
     _gc()
@@ -40,7 +35,6 @@ def add_turn(session_id: str, question: str, answer: str) -> None:
 
 
 def get_context_text(session_id: str) -> str:
-    """Returns conversation history as a formatted block for the LLM prompt, or ''."""
     if not session_id or session_id not in _sessions:
         return ""
     messages = list(_sessions[session_id]["messages"])
@@ -62,7 +56,6 @@ def get_context_text(session_id: str) -> str:
 
 
 def clear_session(session_id: str) -> None:
-    """Clear history for one session (called on 'New Chat')."""
     _sessions.pop(session_id, None)
 
 

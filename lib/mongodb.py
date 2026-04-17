@@ -1,5 +1,3 @@
-# lib/mongodb.py — Async MongoDB connection manager
-
 import os
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from dotenv import load_dotenv
@@ -12,13 +10,12 @@ URI_APPCONFIGS = os.getenv("MONGODB_URI_APPCONFIGS")
 STREAM_DB_NAME     = os.getenv("STREAM_DB_NAME",     "stream-datastore")
 APPCONFIGS_DB_NAME = os.getenv("APPCONFIGS_DB_NAME", "appConfigs")
 
-# Singletons — created on first use, reused until shutdown
 _stream_client:     AsyncIOMotorClient | None = None
 _appconfigs_client: AsyncIOMotorClient | None = None
 
 
 def _build_client(uri: str) -> AsyncIOMotorClient:
-    # 10 pooled connections, 8s timeout if server is unreachable
+    # 10 connections, 8s timeout so startup fails fast if MongoDB is unreachable
     return AsyncIOMotorClient(uri, maxPoolSize=10, serverSelectionTimeoutMS=8_000)
 
 
@@ -54,7 +51,6 @@ async def close_connections() -> None:
 
 
 async def ping_databases() -> dict:
-    """Returns {"stream": "ok", "appconfigs": "ok"} or error strings."""
     results = {}
     try:
         await get_stream_db().command("ping")

@@ -1,6 +1,3 @@
-# lib/chat_history.py — Persistent query history stored in MongoDB
-# Collection: _QUERY_HISTORY_ in stream-datastore. Max 500 entries (oldest auto-trimmed).
-
 import asyncio
 import logging
 from datetime import datetime, timezone
@@ -22,7 +19,6 @@ async def save_query(
     explanation:     str   = "",
     elapsed_seconds: float = 0.0,
 ) -> str:
-    """Insert a successful query into history. Trims oldest entries if over MAX_HISTORY."""
     db  = get_stream_db()
     doc = {
         "question":        question,
@@ -33,6 +29,7 @@ async def save_query(
         "elapsed_seconds": elapsed_seconds,
         "timestamp":       datetime.now(timezone.utc),
     }
+    # asyncio.shield so the write survives if the HTTP client disconnects mid-response
     result = await asyncio.shield(db[HISTORY_COLLECTION].insert_one(doc))
 
     try:
@@ -50,7 +47,6 @@ async def save_query(
 
 
 async def get_history(limit: int = 100) -> list[dict]:
-    """Returns history entries newest-first. ObjectId is serialized to string 'id'."""
     db     = get_stream_db()
     cursor = db[HISTORY_COLLECTION].find({}).sort("timestamp", -1).limit(min(limit, MAX_HISTORY))
 

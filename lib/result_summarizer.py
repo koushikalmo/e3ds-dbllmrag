@@ -1,7 +1,3 @@
-# lib/result_summarizer.py — Chunked map-reduce summarizer for large result sets
-# Small results (<16K chars) → single LLM call.
-# Large results → split into 25-doc chunks, summarize each, then synthesize.
-
 import json
 import asyncio
 from typing import Any
@@ -80,7 +76,6 @@ async def _synthesize_summaries(chunk_summaries: list[str], question: str, total
 
 
 async def summarize_results(results: list[dict], question: str) -> dict:
-    """Summarize a list of MongoDB result documents. Chooses direct or chunked approach."""
     docs_to_analyze = results[:MAX_DOCS_TO_SUMMARIZE]
     total = len(docs_to_analyze)
 

@@ -1,7 +1,3 @@
-# lib/schema_discovery.py — Live schema discovery from MongoDB
-# Samples real documents on startup and hourly, extracts field paths + types,
-# indexes them into the vector store for semantic retrieval per query.
-
 import time
 import json
 import asyncio
@@ -23,7 +19,6 @@ _last_fingerprint: str  = ""
 
 
 def _extract_paths(obj: Any, prefix: str = "", max_depth: int = 5, paths: dict | None = None) -> dict:
-    """Recursively walk a MongoDB document and return {field_path: {type, example}} dict."""
     if paths is None:
         paths = {}
     if max_depth <= 0:
@@ -45,7 +40,6 @@ def _extract_paths(obj: Any, prefix: str = "", max_depth: int = 5, paths: dict |
 
 
 def _merge_path_sets(all_path_sets: list[dict]) -> dict:
-    """Merge field dicts from multiple docs, keeping first non-null example per field."""
     merged = {}
     for paths in all_path_sets:
         for path, info in paths.items():
@@ -104,7 +98,6 @@ async def _sample_appconfigs_schema() -> dict:
 
 
 async def refresh_schema_cache(stream_collection: str = "Apr_2025", force: bool = False) -> dict:
-    """Re-sample MongoDB and refresh the cache. No-op if cache is still fresh."""
     global _schema_cache, _cache_timestamp, _last_fingerprint
 
     now = time.monotonic()
@@ -137,7 +130,6 @@ async def refresh_schema_cache(stream_collection: str = "Apr_2025", force: bool 
         "elapsed_sec": elapsed,
     }
 
-    # Detect schema changes between refreshes
     all_fields = sorted(stream_result["fields"].keys()) + sorted(appconfigs_result.get("usersinfo_fields", {}).keys())
     new_fingerprint = str(hash(tuple(all_fields)))
 
@@ -164,7 +156,6 @@ async def refresh_schema_cache(stream_collection: str = "Apr_2025", force: bool 
 
 
 async def _index_fields_async(cache: dict) -> None:
-    """Background task: embed discovered fields and store in vector store."""
     from lib.embeddings   import embed
     from lib.vector_store import VectorStore
 
@@ -202,7 +193,6 @@ async def _index_fields_async(cache: dict) -> None:
 
 
 def build_dynamic_supplement(include_stream: bool = True, include_appconfigs: bool = True, max_fields: int = 40) -> str:
-    """Builds a concise text block of live schema data to append to the LLM prompt."""
     if not _schema_cache:
         return ""
 
@@ -246,7 +236,6 @@ async def retrieve_schema_context(
     include_appconfigs: bool = False,
     top_k:              int  = 20,
 ) -> str:
-    """Semantic retrieval: returns the top_k most relevant field descriptions for this question."""
     from lib.embeddings   import embed
     from lib.vector_store import VectorStore
 
@@ -284,7 +273,6 @@ async def retrieve_schema_context(
         return _APPCONFIGS_STATIC if include_appconfigs else ""
 
     lines = [f"  {r['text']}" for r in results]
-    # If appConfigs was needed but not found in the vector store, append the static fallback
     if include_appconfigs and not any(r["metadata"].get("db") == "appConfigs" for r in results):
         lines.append(_APPCONFIGS_STATIC)
 

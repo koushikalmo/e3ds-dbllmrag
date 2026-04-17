@@ -1,6 +1,3 @@
-# lib/query_generator.py — Converts natural language questions into validated MongoDB query objects.
-# Flow: keyword scan → RAG examples → schema context → LLM call → validate → fix limits → retry
-
 import os
 import json
 import time
@@ -18,14 +15,12 @@ from lib.query_examples    import (
 
 MAX_ATTEMPTS = int(os.getenv("LLM_MAX_RETRIES", "3"))
 
-# Field name cache — populated from the schema vector store, refreshed hourly
 _known_fields_cache: set[str] = set()
 _known_fields_ts:    float    = 0.0
 _KNOWN_FIELDS_TTL = 3600
 
 
 def _get_known_fields() -> set[str]:
-    """Returns valid field paths from the schema vector store. Falls back to hardcoded set on cold start."""
     global _known_fields_cache, _known_fields_ts
 
     now = time.monotonic()
@@ -59,7 +54,6 @@ def _get_known_fields() -> set[str]:
 
 
 def detect_relevant_databases(question: str) -> tuple[bool, bool]:
-    """Keyword scan to decide which DB schemas to include. Returns (needs_stream, needs_appconfigs)."""
     q = question.lower()
     needs_stream     = any(kw in q for kw in STREAM_KEYWORDS)
     needs_appconfigs = any(kw in q for kw in APPCONFIGS_KEYWORDS)
@@ -69,7 +63,6 @@ def detect_relevant_databases(question: str) -> tuple[bool, bool]:
 
 
 def _extract_json(raw: str) -> dict:
-    """Parse JSON from LLM output. Strips markdown fences if present."""
     text = raw.strip()
     if text.startswith("```"):
         nl   = text.find("\n")
@@ -83,7 +76,6 @@ def _extract_json(raw: str) -> dict:
 
 
 def _fix_pipeline_limits(pipeline: list) -> list:
-    """Deterministically fix $limit placement. Handles count, group, and raw-doc pipelines."""
     if not pipeline:
         return pipeline
 
@@ -109,7 +101,6 @@ def _fix_pipeline_limits(pipeline: list) -> list:
             fixed.append({"$limit": 50})
         return fixed
 
-    # Raw doc query — move $limit to end, cap at 200
     lims   = [i for i, o in enumerate(ops) if o == "$limit"]
     if not lims:
         return list(pipeline) + [{"$limit": 50}]
@@ -121,7 +112,6 @@ def _fix_pipeline_limits(pipeline: list) -> list:
 
 
 def _fix_query_obj(query_obj: dict) -> dict:
-    """Apply _fix_pipeline_limits to all pipelines in the query object."""
     if query_obj.get("queryType") == "single":
         if query_obj.get("operation", "aggregate") == "aggregate" and "pipeline" in query_obj:
             query_obj["pipeline"] = _fix_pipeline_limits(query_obj["pipeline"])
@@ -137,7 +127,6 @@ _VALID_DATABASES  = frozenset({"stream-datastore", "appConfigs"})
 
 
 def _validate_structure(obj: dict) -> dict:
-    """Validate that the LLM output has the shape execute_query() expects. Raises ValueError if unfixable."""
     if not isinstance(obj, dict):
         raise ValueError(f"Expected JSON object, got {type(obj).__name__}")
 
@@ -181,7 +170,6 @@ def _validate_structure(obj: dict) -> dict:
 
 
 def _extract_field_references(obj, depth: int = 0) -> set[str]:
-    """Recursively extract dotted field references from a pipeline or query dict."""
     refs = set()
     if depth > 10:
         return refs
@@ -201,7 +189,6 @@ def _extract_field_references(obj, depth: int = 0) -> set[str]:
 
 
 def _validate_field_names(query_obj: dict) -> list[str]:
-    """Return field references that don't exist in the known schema."""
     targets = []
     if query_obj.get("queryType") == "single":
         op = query_obj.get("operation", "aggregate")
@@ -232,7 +219,6 @@ _FIELD_ALIASES: dict[str, str] = {
 
 
 def _find_closest_field(bad: str) -> str | None:
-    """Return the best-guess correction for a bad field name."""
     lower = bad.lower()
     if lower in _FIELD_ALIASES:
         return _FIELD_ALIASES[lower]
@@ -257,7 +243,6 @@ def _build_correction_prompt(
     suspicious_fields: list[str],
     attempt:           int,
 ) -> str:
-    """Build a retry prompt showing the LLM what went wrong and why."""
     lines = [
         f'Default stream collection: "{collection}"',
         f"Current Unix timestamp: {int(time.time())}",
@@ -291,7 +276,6 @@ async def generate_query(
     collection:       str = "Apr_2025",
     conversation_ctx: str = "",
 ) -> dict:
-    """Convert a plain-English question into a validated MongoDB query object. Retries up to MAX_ATTEMPTS."""
     needs_stream, needs_appconfigs = detect_relevant_databases(question)
     db_hint = "both" if needs_stream and needs_appconfigs else "appconfigs" if needs_appconfigs else "stream"
 
@@ -386,7 +370,6 @@ async def generate_query(
 
 
 def save_successful_query(question: str, query_obj: dict, result_count: int) -> None:
-    """Save a successful query to the RAG example store for future few-shot use."""
     from lib.query_examples import add_example
     needs_stream, needs_appconfigs = detect_relevant_databases(question)
     db_hint = "both" if needs_stream and needs_appconfigs else "appconfigs" if needs_appconfigs else "stream"

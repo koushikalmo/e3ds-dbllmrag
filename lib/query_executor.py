@@ -1,6 +1,3 @@
-# lib/query_executor.py — Executes validated query objects against MongoDB
-# Handles four operation types: aggregate, countDocuments, find, distinct.
-
 import re
 import asyncio
 from typing import Any
@@ -43,7 +40,6 @@ def _expand_diacritics(text: str) -> str:
 
 
 def _normalize_match_query(query: dict) -> dict:
-    """Strip problematic fields and convert plain string values to diacritic-aware regex."""
     if not isinstance(query, dict):
         return query
 
@@ -74,7 +70,7 @@ def _normalize_pipeline(pipeline: list) -> list:
 
 
 def _sanitize_pipeline(pipeline: list) -> list:
-    """Remove $out and $merge — keep queries read-only."""
+    # remove $out/$merge — read-only safety
     clean = []
     for stage in pipeline:
         op = next(iter(stage), None)
@@ -86,7 +82,6 @@ def _sanitize_pipeline(pipeline: list) -> list:
 
 
 def _enforce_limit(pipeline: list) -> list:
-    """Ensure pipeline always has a $limit ≤ MAX_RESULTS."""
     has_limit = any("$limit" in s for s in pipeline)
     if not has_limit:
         return pipeline + [{"$limit": MAX_RESULTS}]
@@ -117,7 +112,6 @@ def _resolve_collection(database: str, collection: str) -> str:
 
 
 def _make_serializable(docs: list[dict]) -> list[dict]:
-    """Convert ObjectId and Decimal128 to JSON-safe Python types."""
     import bson
 
     def convert(val: Any) -> Any:
@@ -148,7 +142,7 @@ async def _run_aggregate(database: str, collection: str, raw_pipeline: list) -> 
 
 
 async def _run_count_documents(database: str, collection: str, query: dict) -> list[dict]:
-    """Use count_documents() instead of aggregate+$count to avoid $limit interference."""
+    # count_documents() instead of aggregate+$count — avoids $limit interference
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
     clean     = _normalize_match_query(query or {})
@@ -183,7 +177,6 @@ async def _run_find(
 async def _run_distinct(
     database: str, collection: str, field: str, query: dict | None = None,
 ) -> list[dict]:
-    """Returns distinct values as [{"value": v}, ...] for consistent rendering."""
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
     clean     = _normalize_match_query(query or {})
@@ -196,7 +189,6 @@ async def _run_distinct(
 
 
 def _raise_friendly(err: Exception, database: str, coll_name: str):
-    """Re-raise MongoDB errors with human-readable messages."""
     s = str(err)
     if "MaxTimeMSExpired" in s or "exceeded time limit" in s.lower():
         raise TimeoutError(
@@ -222,8 +214,6 @@ _run_single = _run_aggregate  # backward-compat alias
 
 
 async def execute_query(query_obj: dict) -> dict:
-    """Execute a validated query object. Dispatches by queryType and operation."""
-
     if query_obj["queryType"] == "single":
         operation = query_obj.get("operation", "aggregate")
         db        = query_obj["database"]
@@ -264,7 +254,6 @@ async def execute_query(query_obj: dict) -> dict:
         )
         print(f"[executor] Dual: primary={len(results1)}, secondary={len(results2)}")
 
-        # In-memory join by mergeKey if provided
         merged = None
         if merge_key := query_obj.get("mergeKey"):
             config_map = {str(doc.get(merge_key) or doc.get("_id", "")): doc for doc in results2}

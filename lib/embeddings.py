@@ -1,7 +1,3 @@
-# lib/embeddings.py — Ollama embedding client (nomic-embed-text)
-# Generates 768-dim vectors used for semantic RAG search (schema fields + query examples).
-# Returns None on any failure — callers fall back to keyword search.
-
 import os
 import logging
 import httpx
@@ -13,7 +9,7 @@ EMBED_MODEL     = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 
 async def embed(text: str) -> list[float] | None:
-    """Returns a 768-dim float vector, or None if unavailable."""
+    # Returns None on any failure — callers fall back to keyword search
     if not text or not text.strip():
         return None
 
@@ -45,7 +41,6 @@ async def embed(text: str) -> list[float] | None:
 
 
 async def embed_batch(texts: list[str]) -> list[list[float] | None]:
-    """Embeds a list sequentially. Individual failures are None."""
     return [await embed(t) for t in texts]
 
 
