@@ -2043,26 +2043,31 @@ function buildFeedbackSection(state, question, queryMeta, resultCount) {
   const badBtn    = bar.querySelector(".btn-feedback.bad");
   const statusEl  = bar.querySelector(".feedback-status");
 
-  async function lockAndShow(rating, message, isOk) {
+  function lockAndShow(rating, message, isOk) {
     goodBtn.disabled = true;
     badBtn.disabled  = true;
     form.style.display = "none";
     statusEl.style.display = "inline";
     statusEl.className = `feedback-status ${isOk ? "ok" : "err"}`;
     statusEl.textContent = message;
-    state.feedbackRating = rating;
+    if (isOk) state.feedbackRating = rating;
   }
 
   goodBtn.addEventListener("click", async () => {
-    goodBtn.classList.add("selected-good");
+    goodBtn.disabled = true;
+    badBtn.disabled  = true;
     statusEl.style.display = "inline";
     statusEl.className = "feedback-status";
     statusEl.textContent = "Submitting…";
     const ok = await submitFeedback(question, queryMeta, resultCount, "good", "", []);
-    lockAndShow("good",
-      ok ? "✓ Marked as correct — used to improve future answers" : "⚠ Could not save (server error)",
-      ok
-    );
+    if (ok) {
+      lockAndShow("good", "✓ Marked as correct — used to improve future answers", true);
+    } else {
+      goodBtn.disabled = false;
+      badBtn.disabled  = false;
+      statusEl.className = "feedback-status err";
+      statusEl.textContent = "⚠ Could not save — please try again";
+    }
   });
 
   badBtn.addEventListener("click", () => {
@@ -2093,10 +2098,20 @@ function buildFeedbackSection(state, question, queryMeta, resultCount) {
     submitBtn.disabled = true;
     submitBtn.textContent = "Submitting…";
     const ok = await submitFeedback(question, queryMeta, resultCount, "bad", note, correctedPipeline);
-    lockAndShow("bad_corrected",
-      ok ? "✓ Correction submitted — will be used as a training example" : "⚠ Could not save (server error)",
-      ok
-    );
+    if (ok) {
+      lockAndShow("bad_corrected", "✓ Correction submitted — will be used as a training example", true);
+    } else {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit Correction";
+      const errEl = form.querySelector(".correction-err") || (() => {
+        const el = document.createElement("div");
+        el.className = "correction-err";
+        el.style.cssText = "font-size:10px;color:var(--red);margin-top:.25rem;";
+        form.querySelector(".correction-form-actions").before(el);
+        return el;
+      })();
+      errEl.textContent = "⚠ Could not save — please try again";
+    }
   });
 
   return section;

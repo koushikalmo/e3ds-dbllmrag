@@ -7,6 +7,7 @@ from lib.schemas           import build_system_prompt, STREAM_KEYWORDS, APPCONFI
 from lib.llm_provider      import generate_with_fallback
 from lib.schema_discovery  import retrieve_schema_context
 from lib.live_data_context import get_live_context
+from lib.data_digest       import get_digest_text
 from lib.query_examples    import (
     find_similar_examples,
     find_similar_examples_vector,
@@ -298,6 +299,9 @@ async def generate_query(
     live_ctx = await get_live_context(collection, question)
     live_ctx_block = f"{live_ctx}\n\n" if live_ctx else ""
 
+    digest_text = get_digest_text()
+    digest_block = f"{digest_text}\n\n" if digest_text else ""
+
     now_unix = int(time.time())
     now_iso  = datetime.now(timezone.utc).isoformat()
 
@@ -307,6 +311,7 @@ async def generate_query(
         f'Default stream collection: "{collection}"\n'
         f"Current UTC time: {now_iso}\n"
         f"Current Unix timestamp: {now_unix}\n\n"
+        f"{digest_block}"
         f"{live_ctx_block}"
         f"Question: {question}"
     )
@@ -314,7 +319,7 @@ async def generate_query(
     print(
         f"[generator] '{question[:60]}' | "
         f"stream={needs_stream} appconfigs={needs_appconfigs} | "
-        f"examples={len(similar)} live_ctx={'yes' if live_ctx else 'no'}"
+        f"examples={len(similar)} live_ctx={'yes' if live_ctx else 'no'} digest={'yes' if digest_text else 'no'}"
     )
 
     last_error, last_raw, last_suspicious = "", "", []

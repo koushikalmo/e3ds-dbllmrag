@@ -28,6 +28,7 @@ from lib.collection_resolver import resolve_and_log, resolve_year
 from lib.query_executor     import get_existing_year_collections, build_year_pipeline
 from lib.response_validator import validate_query_and_result
 from lib.feedback_store     import save_feedback, get_feedback_stats
+from lib.data_digest        import start_digest_scheduler, get_digest_status, refresh_digest
 
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(warm_all_caches(default_collection))
     asyncio.create_task(refresh_schema_cache(stream_collection=default_collection))
     asyncio.create_task(index_all_examples_async())
+    asyncio.create_task(start_digest_scheduler())
 
     yield
 
@@ -115,6 +117,7 @@ async def health_check():
             "live_context":  get_live_cache_status(),
             "rag_examples":  get_example_count(),
             "feedback":      feedback_stats,
+            "data_digest":   get_digest_status(),
             "time":          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         },
         status_code=200 if all_ok else 503,
@@ -323,6 +326,12 @@ async def clear_history():
         return JSONResponse(content={"success": True, "deleted": count})
     except Exception as e:
         return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/digest/refresh")
+async def refresh_digest_endpoint():
+    await refresh_digest(force=True)
+    return JSONResponse(content={"success": True, "data_digest": get_digest_status()})
 
 
 @app.post("/api/schema/refresh")
