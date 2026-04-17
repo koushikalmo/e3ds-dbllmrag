@@ -4,6 +4,7 @@ import httpx
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL",    "qwen2.5-coder:7b")
 OLLAMA_NUM_CTX  = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
+OLLAMA_NUM_GPU  = int(os.getenv("OLLAMA_NUM_GPU", "99"))  # 99 = use GPU for all layers that fit
 
 LLM_PROVIDER = "ollama"
 
@@ -35,6 +36,7 @@ class OllamaProvider:
                 "temperature": 0.1 if json_mode else 0.4,
                 "num_ctx":     self.num_ctx,
                 "num_predict": 2048,
+                "num_gpu":     OLLAMA_NUM_GPU,
             },
         }
         if json_mode:
@@ -97,7 +99,7 @@ async def warmup_model() -> None:
                     "messages": [{"role": "user", "content": 'respond with {"ok":true}'}],
                     "format":   "json",
                     "stream":   False,
-                    "options":  {"temperature": 0, "num_predict": 10},
+                    "options":  {"temperature": 0, "num_predict": 10, "num_gpu": OLLAMA_NUM_GPU},
                     "keep_alive": "30m",
                 },
             )
