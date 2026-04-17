@@ -134,24 +134,35 @@ STREAM-DATASTORE RULES
   For aggregate: first stage must be { "$match": { "e3ds_employee": { "$ne": true } } }
   For countDocuments/find/distinct: include in "query": { "e3ds_employee": { "$ne": true } }
 
-- ALL *_Timestamp fields are FLOATS (Unix seconds).
-  Session start:    VideoStreamStartedAt_Timestamp  ← use this, NOT startTimeStamp
-  Session end:      DisconnectTime_Timestamp
-  Session duration: { "$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"] } → seconds
-  To minutes: { "$divide": [duration_seconds, 60] }
+TIMESTAMP FIELDS — TWO DIFFERENT UNITS, DO NOT MIX:
+
+  VideoStreamStartedAt_Timestamp  → Unix MILLISECONDS  ← session start
+  DisconnectTime_Timestamp        → Unix MILLISECONDS  ← session end
+  startTimeStamp (no _Timestamp)  → Unix SECONDS       ← different field, different unit
+
+  STREAMING DURATION FORMULA (always use these two fields):
+    ms:      { "$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"] }
+    seconds: { "$divide": [<above>, 1000] }
+    minutes: { "$divide": [<above>, 60000] }
+
+  Example pipeline for streaming time per user:
+    { "$addFields": { "durationMs": { "$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"] } } },
+    { "$addFields": { "durationMinutes": { "$divide": ["$durationMs", 60000] } } },
+    { "$match": { "durationMs": { "$gt": 0 } } }
 
 DATE FILTERING — CRITICAL:
-  The current Unix timestamp is provided in every request. Use it as your reference point.
-  DO NOT guess or hardcode timestamps — calculate from the provided Current Unix timestamp.
-  April 16, 2026 = start: 1776297600, end: 1776384000
-  To filter a specific day: { "VideoStreamStartedAt_Timestamp": { "$gte": <day_start>, "$lt": <day_end> } }
+  VideoStreamStartedAt_Timestamp is MILLISECONDS — multiply day boundaries by 1000.
+  The current Unix timestamp is provided in every request (in seconds). Multiply by 1000 for ms comparisons.
+  April 16, 2026 = start: 1776297600000, end: 1776384000000  (milliseconds)
+  To filter a specific day:
+    { "VideoStreamStartedAt_Timestamp": { "$gte": <day_start_ms>, "$lt": <day_end_ms> } }
 
 - webRtcStatsData.avgRoundTripTime is stored as a STRING.
   Always convert before sorting/comparing: { "$toDouble": "$webRtcStatsData.avgRoundTripTime" }
 
 CRITICAL FIELD NAMES (exact case — wrong names return 0 results):
-- Session start:"VideoStreamStartedAt_Timestamp"  ← NOT startTimeStamp
-- Session end:  "DisconnectTime_Timestamp"
+- Session start:"VideoStreamStartedAt_Timestamp"  ← milliseconds. NOT startTimeStamp (that's seconds)
+- Session end:  "DisconnectTime_Timestamp"        ← milliseconds
 - Country:      "clientInfo.country_name"  ← full name like "Brazil". NEVER "country_code".
 - City:         "clientInfo.city"          ← viewer's city (client location)
 - OS:           "userDeviceInfo.os.name"
