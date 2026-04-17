@@ -42,12 +42,16 @@ def _get_known_fields() -> set[str]:
     # Hardcoded fallback — used only before schema discovery has run
     return {
         "appInfo.owner", "appInfo.appName",
+        "loggedInUserData.name",
         "clientInfo.city", "clientInfo.country_name",
         "userDeviceInfo.os.name", "userDeviceInfo.client.name",
         "webRtcStatsData.avgBitrate", "webRtcStatsData.packetsLost",
         "webRtcStatsData.avgRoundTripTime",
         "elInfo.computerName", "elInfo.systemInfo.cpu.brand",
-        "VideoStreamStartedAt_Timestamp", "DisconnectTime_Timestamp", "loadTime",
+        "VideoStreamStartedAt_Timestamp",
+        "VideoStreamContinuedAt_Timestamp",
+        "DataChannelHeartBeatReceivedAt_Timestamp",
+        "DisconnectTime_Timestamp", "loadTime",
         "e3ds_employee", "maxUserLimit",
         "SubscriptionEndDate._seconds", "SubscriptionStartDate._seconds",
     }

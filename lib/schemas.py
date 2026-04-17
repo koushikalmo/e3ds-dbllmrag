@@ -125,9 +125,11 @@ AGGREGATE $LIMIT RULES:
 STREAM-DATASTORE RULES
 ═══════════════════════════════════════════════
 - Collections are named by month: "Apr_2026", "Mar_2026", "Feb_2026", etc.
+- The backend resolves the collection from the question before sending it to you.
+  Always use the collection name provided in "Default stream collection" — it is already correct.
+  Do NOT override it or guess a different collection based on the question text.
 - YEAR QUERIES: If the user asks about a full year (e.g. "in 2026", "during 2026"),
-  use the earliest available month as the collection (e.g. "Jan_2026").
-  The backend automatically expands the query across all months of that year.
+  use the collection provided. The backend automatically expands across all months.
 - ALWAYS filter internal traffic first: { "e3ds_employee": { "$ne": true } }
   This uses $ne:true (not equals true) instead of false, so it correctly includes
   documents where e3ds_employee is absent, null, or false — all are real user sessions.
@@ -136,19 +138,30 @@ STREAM-DATASTORE RULES
 
 TIMESTAMP FIELDS — TWO DIFFERENT UNITS, DO NOT MIX:
 
-  VideoStreamStartedAt_Timestamp  → Unix MILLISECONDS  ← session start
-  DisconnectTime_Timestamp        → Unix MILLISECONDS  ← session end
-  startTimeStamp (no _Timestamp)  → Unix SECONDS       ← different field, different unit
+  VideoStreamStartedAt_Timestamp         → Unix MILLISECONDS  ← session start
+  VideoStreamContinuedAt_Timestamp       → Unix MILLISECONDS  ← last video heartbeat (use as end)
+  DataChannelHeartBeatReceivedAt_Timestamp → Unix MILLISECONDS ← last data heartbeat (use as end)
+  DisconnectTime_Timestamp               → Unix MILLISECONDS  ← player disconnect (NOT for duration)
+  startTimeStamp (no _Timestamp)         → Unix SECONDS       ← different field, different unit
 
-  STREAMING DURATION FORMULA (always use these two fields):
-    ms:      { "$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"] }
-    seconds: { "$divide": [<above>, 1000] }
-    minutes: { "$divide": [<above>, 60000] }
+  STREAMING DURATION FORMULA:
+    duration = VideoStreamContinuedAt_Timestamp - VideoStreamStartedAt_Timestamp
+    OR (if VideoStreamContinuedAt_Timestamp is absent):
+    duration = DataChannelHeartBeatReceivedAt_Timestamp - VideoStreamStartedAt_Timestamp
 
-  Example pipeline for streaming time per user:
-    { "$addFields": { "durationMs": { "$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"] } } },
-    { "$addFields": { "durationMinutes": { "$divide": ["$durationMs", 60000] } } },
-    { "$match": { "durationMs": { "$gt": 0 } } }
+    Use $ifNull to pick the correct end field, then subtract start:
+
+    Step 1 — pick end timestamp (VideoStreamContinuedAt first, fallback to DataChannel heartbeat):
+      { "$addFields": { "streamEndTs": { "$ifNull": ["$VideoStreamContinuedAt_Timestamp", "$DataChannelHeartBeatReceivedAt_Timestamp"] } } }
+    Step 2 — subtract start:
+      { "$addFields": { "durationMs": { "$subtract": ["$streamEndTs", "$VideoStreamStartedAt_Timestamp"] } } }
+    Step 3 — filter bad/negative values:
+      { "$match": { "durationMs": { "$gt": 0 } } }
+    Step 4 — convert:
+      minutes: { "$divide": ["$durationMs", 60000] }
+      seconds: { "$divide": ["$durationMs", 1000] }
+
+    NEVER use $max of both fields. NEVER use DisconnectTime_Timestamp for duration.
 
 DATE FILTERING — CRITICAL:
   VideoStreamStartedAt_Timestamp is MILLISECONDS — multiply day boundaries by 1000.
@@ -161,8 +174,12 @@ DATE FILTERING — CRITICAL:
   Always convert before sorting/comparing: { "$toDouble": "$webRtcStatsData.avgRoundTripTime" }
 
 CRITICAL FIELD NAMES (exact case — wrong names return 0 results):
-- Session start:"VideoStreamStartedAt_Timestamp"  ← milliseconds. NOT startTimeStamp (that's seconds)
-- Session end:  "DisconnectTime_Timestamp"        ← milliseconds
+- Session start:    "VideoStreamStartedAt_Timestamp"              ← ms. NOT startTimeStamp (seconds)
+- Streaming end:    "VideoStreamContinuedAt_Timestamp"            ← ms, last video heartbeat
+- Streaming end:    "DataChannelHeartBeatReceivedAt_Timestamp"    ← ms, last data heartbeat
+- Use $max of both heartbeat fields as the streaming end time for accurate duration
+- Disconnect:       "DisconnectTime_Timestamp"  ← ms, player closed — do NOT use for duration
+- User name:    "loggedInUserData.name"           ← real viewer name (null when not logged in)
 - Country:      "clientInfo.country_name"  ← full name like "Brazil". NEVER "country_code".
 - City:         "clientInfo.city"          ← viewer's city (client location)
 - OS:           "userDeviceInfo.os.name"
@@ -171,6 +188,20 @@ CRITICAL FIELD NAMES (exact case — wrong names return 0 results):
 - App:          "appInfo.appName"
 - VPN:          "clientInfo.fullInfo.security.is_vpn"  ← boolean
 - Server city:  "elInfo.city"              ← streaming server location (NOT client)
+
+USER NAME QUERIES — ALWAYS GROUP:
+  loggedInUserData.name is sparse — many sessions have no logged-in user (null).
+  NEVER use loggedInUserData in a $match filter — it is absent on most docs.
+  When asked for "users name and streaming time", ALWAYS use $group, not $project:
+  {
+    "$group": {
+      "_id": "$loggedInUserData.name",
+      "userName": { "$first": "$loggedInUserData.name" },
+      "sessionCount": { "$sum": 1 },
+      "totalMinutesStreamed": { "$sum": { "$divide": ["$durationMs", 60000] } }
+    }
+  }
+  This groups anonymous sessions under userName=null and named sessions by their name.
 
 CLIENT vs SERVER LOCATION:
 - User asks about viewer location → use clientInfo.city / clientInfo.country_name
@@ -295,7 +326,11 @@ STREAM_KEYWORDS = {
     "webrtc", "ice", "turn", "stun", "peer",
     "april", "march", "february", "january", "may", "june", "july",
     "august", "september", "october", "november", "december",
-    "today", "week", "month", "recent", "latest", "this month",
+    "today", "yesterday", "last 7 days", "last 30 days", "past week",
+    "this week", "this year", "last year", "last month",
+    "week", "month", "recent", "latest", "this month",
+    "q1", "q2", "q3", "q4", "quarter", "first quarter", "second quarter",
+    "third quarter", "fourth quarter",
     "top", "worst", "best", "average", "slow", "fast", "most", "least",
     "count", "total", "how many", "list",
 }

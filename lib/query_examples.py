@@ -61,15 +61,20 @@ BOOTSTRAP_EXAMPLES = [
         "query": {
             "queryType": "single", "database": "stream-datastore", "collection": "Apr_2026",
             "pipeline": [
-                {"$match": {"e3ds_employee": {"$ne": True}, "DisconnectTime_Timestamp": {"$exists": True}, "VideoStreamStartedAt_Timestamp": {"$exists": True}}},
-                {"$addFields": {"durationMs": {"$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"]}}},
-                {"$addFields": {"durationMinutes": {"$divide": ["$durationMs", 60000]}}},
+                {"$match": {"e3ds_employee": {"$ne": True}, "VideoStreamStartedAt_Timestamp": {"$exists": True}}},
+                {"$addFields": {"streamEndTs": {"$ifNull": ["$VideoStreamContinuedAt_Timestamp", "$DataChannelHeartBeatReceivedAt_Timestamp"]}}},
+                {"$addFields": {"durationMs": {"$subtract": ["$streamEndTs", "$VideoStreamStartedAt_Timestamp"]}}},
                 {"$match": {"durationMs": {"$gt": 0}}},
-                {"$group": {"_id": "$appInfo.owner", "totalMinutes": {"$sum": "$durationMinutes"}, "sessions": {"$sum": 1}}},
-                {"$sort": {"totalMinutes": -1}}, {"$limit": 50},
+                {"$group": {
+                    "_id": "$loggedInUserData.name",
+                    "userName": {"$first": "$loggedInUserData.name"},
+                    "sessionCount": {"$sum": 1},
+                    "totalMinutesStreamed": {"$sum": {"$divide": ["$durationMs", 60000]}},
+                }},
+                {"$sort": {"totalMinutesStreamed": -1}}, {"$limit": 50},
             ],
-            "explanation": "Total streaming minutes per owner. VideoStreamStartedAt_Timestamp and DisconnectTime_Timestamp are milliseconds — divide by 60000 for minutes.",
-            "resultLabel": "Streaming Time by Owner",
+            "explanation": "Duration = VideoStreamContinuedAt_Timestamp (fallback DataChannelHeartBeatReceivedAt_Timestamp) - VideoStreamStartedAt_Timestamp / 60000.",
+            "resultLabel": "Streaming Time by User",
         },
         "result_count": 30, "db_hint": "stream",
     },
@@ -78,11 +83,11 @@ BOOTSTRAP_EXAMPLES = [
         "query": {
             "queryType": "single", "database": "stream-datastore", "collection": "Apr_2026",
             "pipeline": [
-                {"$match": {"e3ds_employee": {"$ne": True}, "DisconnectTime_Timestamp": {"$exists": True}, "VideoStreamStartedAt_Timestamp": {"$exists": True}}},
-                {"$addFields": {"durationMs": {"$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"]}}},
-                {"$addFields": {"durationMinutes": {"$divide": ["$durationMs", 60000]}}},
+                {"$match": {"e3ds_employee": {"$ne": True}, "VideoStreamStartedAt_Timestamp": {"$exists": True}}},
+                {"$addFields": {"streamEndTs": {"$ifNull": ["$VideoStreamContinuedAt_Timestamp", "$DataChannelHeartBeatReceivedAt_Timestamp"]}}},
+                {"$addFields": {"durationMs": {"$subtract": ["$streamEndTs", "$VideoStreamStartedAt_Timestamp"]}}},
                 {"$match": {"durationMs": {"$gt": 0}}},
-                {"$group": {"_id": "$clientInfo.city", "avgDurationMinutes": {"$avg": "$durationMinutes"}, "sessions": {"$sum": 1}}},
+                {"$group": {"_id": "$clientInfo.city", "avgDurationMinutes": {"$avg": {"$divide": ["$durationMs", 60000]}}, "sessions": {"$sum": 1}}},
                 {"$sort": {"sessions": -1}}, {"$limit": 50},
             ],
             "explanation": "Average session duration in minutes per city. Uses VideoStreamStartedAt_Timestamp and DisconnectTime_Timestamp (both milliseconds).",
@@ -177,28 +182,28 @@ BOOTSTRAP_EXAMPLES = [
             "pipeline": [
                 {"$match": {
                     "e3ds_employee": {"$ne": True},
-                    # VideoStreamStartedAt_Timestamp is milliseconds — April 16 2026
                     "VideoStreamStartedAt_Timestamp": {"$gte": 1776297600000, "$lt": 1776384000000},
                 }},
                 {"$addFields": {
-                    "durationMs": {"$subtract": ["$DisconnectTime_Timestamp", "$VideoStreamStartedAt_Timestamp"]},
+                    "streamEndTs": {"$ifNull": ["$VideoStreamContinuedAt_Timestamp", "$DataChannelHeartBeatReceivedAt_Timestamp"]},
                 }},
                 {"$addFields": {
-                    "streamingMinutes": {"$divide": ["$durationMs", 60000]},
+                    "durationMs": {"$subtract": ["$streamEndTs", "$VideoStreamStartedAt_Timestamp"]},
                 }},
                 {"$match": {"durationMs": {"$gt": 0}}},
-                {"$project": {
-                    "owner": "$appInfo.owner",
-                    "streamingMinutes": 1,
-                    "durationMs": 1,
+                {"$group": {
+                    "_id": "$loggedInUserData.name",
+                    "userName": {"$first": "$loggedInUserData.name"},
+                    "sessionCount": {"$sum": 1},
+                    "totalMinutesStreamed": {"$sum": {"$divide": ["$durationMs", 60000]}},
                 }},
-                {"$sort": {"streamingMinutes": -1}},
+                {"$sort": {"totalMinutesStreamed": -1}},
                 {"$limit": 200},
             ],
-            "explanation": "Lists all users with streaming duration in minutes on April 16 2026.",
+            "explanation": "Duration = VideoStreamContinuedAt_Timestamp (or DataChannelHeartBeatReceivedAt_Timestamp fallback) - VideoStreamStartedAt_Timestamp, divided by 60000 for minutes.",
             "resultLabel": "User Streaming Time — Apr 16 2026",
         },
-        "result_count": 50, "db_hint": "stream",
+        "result_count": 13, "db_hint": "stream",
     },
     {
         "question": "Show active subscriptions with sessions count for each owner",
