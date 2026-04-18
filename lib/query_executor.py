@@ -305,14 +305,32 @@ async def execute_query(query_obj: dict) -> dict:
 
         merged = None
         if merge_key := query_obj.get("mergeKey"):
-            config_map = {str(doc.get(merge_key) or doc.get("_id", "")): doc for doc in results2}
+            r_stream, r_config, q_config = results1, results2, q2
+            if q1.get("database") == "appConfigs":
+                r_stream, r_config, q_config = results2, results1, q1
+
+            owner_from_config = str(q_config.get("collection", ""))
+            
+            combined_config = {}
+            for doc in r_config:
+                combined_config.update(doc)
+                
+            config_map = {owner_from_config: combined_config} if owner_from_config else {}
+            
+            for doc in r_config:
+                doc_owner = str(doc.get(merge_key) or doc.get("_id", ""))
+                if doc_owner and doc_owner not in ("usersinfo", "default", "InfoToConstructUrls"):
+                    config_map[doc_owner] = doc
+
             merged = []
-            for doc in results1:
-                owner    = str(doc.get(merge_key) or doc.get("appInfo", {}).get("owner", "") or "")
+            for doc in r_stream:
+                app_info = doc.get("appInfo") or {}
+                owner    = str(doc.get(merge_key) or app_info.get("owner", "") or doc.get("_id", "") or "")
                 enriched = dict(doc)
                 if owner and owner in config_map:
                     enriched["_configData"] = config_map[owner]
                 merged.append(enriched)
+
             matched = sum(1 for d in merged if "_configData" in d)
             print(f"[executor] Merged {len(merged)} docs, {matched} with config data")
 
