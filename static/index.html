@@ -1894,31 +1894,117 @@ function fmtTime(iso) {
 
 
 // ── Voice input ───────────────────────────────────────────────
-voiceBtn.addEventListener("click", () => { isListening ? stopVoice() : startVoice(); });
+const VOICE_SECURE = window.isSecureContext;
+const VOICE_HAS_SR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+const VOICE_HAS_MR = !!(navigator.mediaDevices && window.MediaRecorder);
+
+(function initVoiceBtn() {
+  if (!VOICE_SECURE) {
+    voiceBtn.title = "Voice requires HTTPS — click to switch";
+    voiceBtn.style.opacity = "0.5";
+    voiceBtn.addEventListener("click", () => {
+      const httpsUrl = location.href.replace(/^http:/, "https:").replace(/:4500/, "");
+      if (confirm("Microphone requires HTTPS.\n\nSwitch to: " + httpsUrl + " ?")) {
+        location.href = httpsUrl;
+      }
+    });
+    return;
+  }
+  if (!VOICE_HAS_SR && !VOICE_HAS_MR) {
+    voiceBtn.disabled = true;
+    voiceBtn.title = "Voice input not supported in this browser";
+    return;
+  }
+  voiceBtn.addEventListener("click", () => { isListening ? stopVoice() : startVoice(); });
+})();
 
 function startVoice() {
+  if (VOICE_HAS_SR) startVoiceSR(); else startVoiceMR();
+}
+
+// Web Speech API — Chrome, Edge, Safari (real-time streaming)
+function startVoiceSR() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert("Voice input requires Chrome or Edge."); return; }
   recognition = new SR();
-  recognition.continuous = false; recognition.interimResults = true; recognition.lang = "en-US";
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
   let lastTranscript = "";
-  recognition.onstart = () => {
-    isListening = true;
-    voiceBtn.classList.add("active");
-    listeningHint.style.display = "inline";
-    inputWrap.classList.add("listening");
-  };
+  recognition.onstart  = () => startVoiceUI("Listening\u2026");
   recognition.onresult = e => {
     lastTranscript = Array.from(e.results).map(r => r[0].transcript).join("");
     questionInput.value = lastTranscript;
     questionInput.dispatchEvent(new Event("input"));
   };
-  recognition.onend   = () => { stopVoiceUI(); if (lastTranscript.trim()) submitQuery(); };
-  recognition.onerror = () => { stopVoiceUI(); };
+  recognition.onend    = () => { stopVoiceUI(); if (lastTranscript.trim()) submitQuery(); };
+  recognition.onerror  = e => {
+    stopVoiceUI();
+    if (e.error === "not-allowed") alert("Microphone permission denied. Please allow access and try again.");
+  };
   recognition.start();
 }
 
-function stopVoice()   { recognition?.stop(); stopVoiceUI(); }
+// MediaRecorder → server Whisper — Firefox and any browser without Web Speech API
+let mediaRecorder = null;
+let audioChunks   = [];
+async function startVoiceMR() {
+  try {
+    const stream   = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+    mediaRecorder  = new MediaRecorder(stream, { mimeType });
+    audioChunks    = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      stopVoiceUI();
+      await transcribeBlob(new Blob(audioChunks, { type: mimeType }), mimeType);
+    };
+    mediaRecorder.start();
+    startVoiceUI("Recording\u2026 (tap mic to stop)");
+  } catch (err) {
+    stopVoiceUI();
+    if (err.name === "NotAllowedError") alert("Microphone permission denied. Please allow access and try again.");
+    else alert("Could not access microphone: " + err.message);
+  }
+}
+
+async function transcribeBlob(blob, mimeType) {
+  const ext  = mimeType.includes("ogg") ? "ogg" : "webm";
+  const form = new FormData();
+  form.append("audio", blob, "voice." + ext);
+  listeningHint.textContent  = "\u23f3 Transcribing\u2026";
+  listeningHint.style.display = "inline";
+  try {
+    const res  = await fetch("/api/transcribe", { method: "POST", body: form });
+    const data = await res.json();
+    listeningHint.style.display = "none";
+    if (data.transcript && data.transcript.trim()) {
+      questionInput.value = data.transcript.trim();
+      questionInput.dispatchEvent(new Event("input"));
+      submitQuery();
+    } else if (data.error) {
+      alert("Transcription error: " + data.error);
+    }
+  } catch {
+    listeningHint.style.display = "none";
+    alert("Transcription failed. Please try again.");
+  }
+}
+
+function stopVoice() {
+  if (VOICE_HAS_SR && recognition) { recognition.stop(); }
+  else if (mediaRecorder && mediaRecorder.state !== "inactive") { mediaRecorder.stop(); }
+  else { stopVoiceUI(); }
+}
+
+function startVoiceUI(msg) {
+  isListening = true;
+  voiceBtn.classList.add("active");
+  listeningHint.textContent   = "\u25cf " + msg;
+  listeningHint.style.display = "inline";
+  inputWrap.classList.add("listening");
+}
+
 function stopVoiceUI() {
   isListening = false;
   voiceBtn.classList.remove("active");

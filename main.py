@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -404,6 +404,31 @@ async def get_shared_chat(share_id: str):
 @app.get("/share/{share_id}", include_in_schema=False)
 async def serve_shared_chat_page(share_id: str):
     return FileResponse("static/index.html")
+
+
+@app.post("/api/transcribe")
+async def transcribe_audio(audio: UploadFile = File(...)):
+    import tempfile, os
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:
+        return JSONResponse({"error": "faster-whisper not installed. Run: pip install faster-whisper"}, status_code=501)
+    try:
+        if not hasattr(app.state, "whisper_model"):
+            app.state.whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+        data = await audio.read()
+        ext = ".webm" if "webm" in (audio.content_type or "") else ".wav" if "wav" in (audio.content_type or "") else ".ogg"
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
+            f.write(data)
+            tmp_path = f.name
+        try:
+            segments, _ = app.state.whisper_model.transcribe(tmp_path, language="en")
+            transcript = " ".join(seg.text.strip() for seg in segments).strip()
+        finally:
+            os.unlink(tmp_path)
+        return {"transcript": transcript}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 if __name__ == "__main__":
