@@ -1900,13 +1900,10 @@ const VOICE_HAS_MR = !!(navigator.mediaDevices && window.MediaRecorder);
 
 (function initVoiceBtn() {
   if (!VOICE_SECURE) {
-    voiceBtn.title = "Voice requires HTTPS — click to switch";
+    voiceBtn.title = "Voice requires HTTPS";
     voiceBtn.style.opacity = "0.5";
     voiceBtn.addEventListener("click", () => {
-      const httpsUrl = location.href.replace(/^http:/, "https:").replace(/:4500/, "");
-      if (confirm("Microphone requires HTTPS.\n\nSwitch to: " + httpsUrl + " ?")) {
-        location.href = httpsUrl;
-      }
+      alert("Voice input requires HTTPS.\n\nAsk your admin to enable HTTPS (SSL) on this server to use the microphone.");
     });
     return;
   }
