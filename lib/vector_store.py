@@ -184,16 +184,24 @@ class VectorStore:
     def all_items(self) -> list[dict]:
         if self._use_chroma:
             try:
-                r = self._col.get(include=["documents", "metadatas", "embeddings"])
-                return [
-                    {
-                        "id":        r["ids"][i],
-                        "text":      (r.get("documents") or [""])[i],
-                        "embedding": (r.get("embeddings") or [[]])[i],
-                        "metadata":  _deserialize_meta((r.get("metadatas") or [{}])[i]),
-                    }
-                    for i in range(len(r["ids"]))
-                ]
+                r     = self._col.get(include=["documents", "metadatas", "embeddings"])
+                ids   = r["ids"]
+                docs  = r.get("documents")
+                embs  = r.get("embeddings")
+                metas = r.get("metadatas")
+                out   = []
+                for i in range(len(ids)):
+                    emb = embs[i] if embs is not None else []
+                    # ChromaDB may return numpy arrays — convert to plain list
+                    if hasattr(emb, "tolist"):
+                        emb = emb.tolist()
+                    out.append({
+                        "id":        ids[i],
+                        "text":      docs[i]  if docs  is not None else "",
+                        "embedding": emb,
+                        "metadata":  _deserialize_meta(metas[i] if metas is not None else {}),
+                    })
+                return out
             except Exception as e:
                 logger.error(f"[vector_store:{self._name}] all_items error: {e}")
                 return []
@@ -279,9 +287,12 @@ class VectorStore:
                 return []
 
             ids       = result["ids"][0]
-            docs      = (result.get("documents") or [[]])[0]
-            metas     = (result.get("metadatas")  or [[]])[0]
-            distances = (result.get("distances")  or [[]])[0]
+            _docs     = result.get("documents")
+            _metas    = result.get("metadatas")
+            _dists    = result.get("distances")
+            docs      = _docs[0]  if _docs  is not None else []
+            metas     = _metas[0] if _metas is not None else []
+            distances = _dists[0] if _dists is not None else []
 
             out = []
             for id_, doc, meta, dist in zip(ids, docs, metas, distances):
