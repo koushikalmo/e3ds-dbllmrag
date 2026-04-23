@@ -25,8 +25,12 @@ dist/
 *.egg
 .eggs/
 
-# App data (auto-generated, not source)
+# App data (auto-generated, never commit these)
 data/query_examples.json
+data/vectors/
+data/chroma/
+data/data_digest.json
+data/db_registry.json
 
 # Editor / IDE
 .vscode/

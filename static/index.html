@@ -645,6 +645,22 @@
       .correction-form { padding: .6rem; }
       .btn-feedback { padding: 6px 12px; }
     }
+
+    /* ── Ask Again button ────────────────────────────────────── */
+    .btn-ask-again {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: 1px solid var(--border2); color: var(--dim);
+      padding: 5px 14px; border-radius: 6px; font-family: var(--mono);
+      font-size: 11px; cursor: pointer; letter-spacing: .05em;
+      transition: all .15s; margin-top: .5rem;
+    }
+    .btn-ask-again:hover { border-color: var(--accent); color: var(--accent); background: #fff7ed; }
+    .btn-ask-again svg { flex-shrink: 0; }
+
+    /* Ask Again inside error card */
+    .msg-error-footer {
+      margin-top: .6rem; display: flex; align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -992,7 +1008,7 @@ async function submitQuery() {
     }
 
     if (msg) {
-      replaceLoadingWithError(loadingEl, msg);
+      replaceLoadingWithError(loadingEl, msg, q);
       const turn = { role: "turn", question: q, error: msg, ts: new Date().toISOString() };
       currentTurns.push(turn);
       persistCurrentSession(q);
@@ -1082,13 +1098,34 @@ function replaceLoadingWithResult(loadingEl, data) {
   body.appendChild(buildResultCard(data));
 }
 
-function replaceLoadingWithError(loadingEl, msg) {
+function replaceLoadingWithError(loadingEl, msg, originalQuestion) {
   const body = loadingEl.querySelector(".msg-assistant-body");
-  body.innerHTML = `
-    <div class="msg-error-card">
-      <span class="msg-error-label">ERROR: </span>${escHtml(msg)}
-    </div>
-  `;
+  const errorCard = document.createElement("div");
+  errorCard.className = "msg-error-card";
+  errorCard.innerHTML = `<span class="msg-error-label">ERROR: </span>${escHtml(msg)}`;
+
+  if (originalQuestion) {
+    const footer = document.createElement("div");
+    footer.className = "msg-error-footer";
+    const retryBtn = document.createElement("button");
+    retryBtn.className = "btn-ask-again";
+    retryBtn.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.17"/>
+      </svg>
+      Ask Again`;
+    retryBtn.addEventListener("click", () => {
+      questionInput.value = originalQuestion;
+      questionInput.dispatchEvent(new Event("input"));
+      questionInput.focus();
+      submitQuery();
+    });
+    footer.appendChild(retryBtn);
+    errorCard.appendChild(footer);
+  }
+
+  body.innerHTML = "";
+  body.appendChild(errorCard);
 }
 
 
@@ -1202,6 +1239,27 @@ function buildResultCard(data) {
   toggle.className = "raw-data-toggle";
   toggle.innerHTML = `<span class="toggle-arrow">▶</span> Raw Data (${count} result${count !== 1 ? "s" : ""})`;
   wrapper.appendChild(toggle);
+
+  // Ask Again button — sits directly below the Raw Data toggle
+  const askAgainBtn = document.createElement("button");
+  askAgainBtn.className = "btn-ask-again";
+  askAgainBtn.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.17"/>
+    </svg>
+    Ask Again`;
+  const _askQuestion = (data.meta && data.meta.question) ? data.meta.question : "";
+  if (_askQuestion) {
+    askAgainBtn.addEventListener("click", () => {
+      questionInput.value = _askQuestion;
+      questionInput.dispatchEvent(new Event("input"));
+      questionInput.focus();
+      submitQuery();
+    });
+  } else {
+    askAgainBtn.style.display = "none";
+  }
+  wrapper.appendChild(askAgainBtn);
 
   const rawSection = document.createElement("div");
   rawSection.className = "raw-data-section";
@@ -1645,12 +1703,36 @@ function loadSession(chatId) {
     if (turn.error) {
       const wrap = document.createElement("div");
       wrap.className = "msg msg-assistant";
-      wrap.innerHTML = `
-        <div class="msg-assistant-avatar">AI</div>
-        <div class="msg-assistant-body">
-          <div class="msg-error-card"><span class="msg-error-label">ERROR: </span>${escHtml(turn.error)}</div>
-        </div>
-      `;
+      const errorAvatar = document.createElement("div");
+      errorAvatar.className = "msg-assistant-avatar";
+      errorAvatar.textContent = "AI";
+      const errorBody = document.createElement("div");
+      errorBody.className = "msg-assistant-body";
+      const errorCard = document.createElement("div");
+      errorCard.className = "msg-error-card";
+      errorCard.innerHTML = `<span class="msg-error-label">ERROR: </span>${escHtml(turn.error)}`;
+      if (turn.question) {
+        const footer = document.createElement("div");
+        footer.className = "msg-error-footer";
+        const retryBtn = document.createElement("button");
+        retryBtn.className = "btn-ask-again";
+        retryBtn.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.17"/>
+          </svg>
+          Ask Again`;
+        retryBtn.addEventListener("click", () => {
+          questionInput.value = turn.question;
+          questionInput.dispatchEvent(new Event("input"));
+          questionInput.focus();
+          submitQuery();
+        });
+        footer.appendChild(retryBtn);
+        errorCard.appendChild(footer);
+      }
+      errorBody.appendChild(errorCard);
+      wrap.appendChild(errorAvatar);
+      wrap.appendChild(errorBody);
       messagesEl.appendChild(wrap);
     } else if (turn.data) {
       const wrap   = document.createElement("div");

@@ -29,6 +29,24 @@ from lib.query_executor     import get_existing_year_collections, build_year_pip
 from lib.response_validator import validate_query_and_result
 from lib.feedback_store     import save_feedback, get_feedback_stats
 from lib.data_digest        import start_digest_scheduler, get_digest_status, refresh_digest
+from lib.vector_store       import _get_client as _get_chroma_client
+
+
+def _chroma_status() -> dict:
+    try:
+        client = _get_chroma_client()
+        if client is None:
+            return {"status": "unavailable", "collections": []}
+        cols = client.list_collections()
+        return {
+            "status":      "ok",
+            "collections": [
+                {"name": c.name, "count": c.count()}
+                for c in cols
+            ],
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:200]}
 
 
 @asynccontextmanager
@@ -118,6 +136,7 @@ async def health_check():
             "rag_examples":  get_example_count(),
             "feedback":      feedback_stats,
             "data_digest":   get_digest_status(),
+            "vector_db":     _chroma_status(),
             "time":          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         },
         status_code=200 if all_ok else 503,
@@ -135,6 +154,7 @@ async def llm_status():
         "schema_cache": get_cache_status(),
         "live_context": get_live_cache_status(),
         "rag_examples": get_example_count(),
+        "vector_db":    _chroma_status(),
     })
 
 
