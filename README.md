@@ -85,5 +85,3 @@ last run.
   worked example of a query going through the system
 - `working_principle.md` — how the whole pipeline works, file by file,
   function by function, in execution order
-- `SETUP.md` — longer setup/deploy guide (systemd, HTTPS, etc.)
-- `CLAUDE.md` — short project brief
