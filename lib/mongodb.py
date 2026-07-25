@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from dotenv import load_dotenv

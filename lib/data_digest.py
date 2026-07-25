@@ -1,7 +1,7 @@
-"""
-Persistent data digest — samples real documents every 3 days and stores field
-names + example values to disk. Injected into the LLM system prompt so the
-model always knows exact field spellings and real value formats.
+from __future__ import annotations
+"""Samples real documents every 3 days and keeps field names + example values
+on disk. Gets injected into the LLM prompt so the model sees exact field
+spellings and real value formats instead of guessing.
 """
 
 import json
@@ -32,7 +32,7 @@ _STRIP_FIELDS = frozenset({
 _digest: dict = {}
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# helpers
 
 def _should_strip(path: str) -> bool:
     return any(path == f or path.startswith(f + ".") or path.startswith(f + "[]") for f in _STRIP_FIELDS)
@@ -78,7 +78,7 @@ def _build_field_summary(docs: list[dict]) -> dict[str, dict]:
     }
 
 
-# ── sampling ──────────────────────────────────────────────────────────────────
+# sampling
 
 async def _sample_stream(collection: str) -> dict:
     from lib.mongodb import get_stream_db
@@ -129,7 +129,7 @@ async def _sample_appconfigs(owner_count: int = 3) -> dict:
     }
 
 
-# ── refresh ───────────────────────────────────────────────────────────────────
+# refresh
 
 async def refresh_digest(force: bool = False) -> None:
     global _digest
@@ -206,7 +206,7 @@ def load_from_file() -> None:
         logger.warning(f"[data_digest] Could not load digest file: {e}")
 
 
-# ── LLM prompt text ───────────────────────────────────────────────────────────
+# prompt text
 
 def get_digest_text() -> str:
     if not _digest:
@@ -259,7 +259,7 @@ def get_digest_status() -> dict:
     }
 
 
-# ── scheduler ─────────────────────────────────────────────────────────────────
+# scheduler
 
 async def _run_scheduler() -> None:
     while True:

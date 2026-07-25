@@ -1,9 +1,4 @@
-# System Overview
-
-One file to understand and run the whole thing: how to start it step by
-step, what each file does, and what happens between you hitting Enter on a
-question and seeing results. For deeper internals (formulas, validator
-codes, function-level detail) see `working_principle.md`.
+# Detail System Overview
 
 ## Part 1 — Start the system, step by step
 
@@ -14,6 +9,7 @@ FastAPI server. In order:
 
 ```bash
 ollama serve                      # leave this running in its own terminal
+# We can pull any larger model based on our vram size( Qwen, Gemma etc...)
 ollama pull qwen2.5-coder:7b      # the model that writes the queries
 ollama pull nomic-embed-text      # the model that powers RAG similarity search
 ```
@@ -30,11 +26,8 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
+# then we need to add all environment variables.
 ```
-
-Open `.env` and fill in `MONGODB_URI_STREAM` and `MONGODB_URI_APPCONFIGS`.
-Everything else has sane defaults. Add `TRAINER_PASSWORD=something` if you
-want trainer mode.
 
 **Step 4 — Run the server**
 
@@ -49,14 +42,8 @@ curl http://localhost:8000/api/health    # should say "ok" for both databases
 curl http://localhost:8000/api/status    # should show your Ollama model as available
 ```
 
-Then open **http://localhost:8000** in a browser and ask a question.
 
-Note: the first minute after startup the server is warming up in the
-background — loading the model into VRAM, sampling the databases for live
-schema, embedding RAG examples. Queries work during warmup, they just get
-faster and smarter once it's done.
-
-## Part 2 — What each file does
+## Part 2 — Each Files Working Principle
 
 **Entry point**
 
@@ -69,7 +56,7 @@ faster and smarter once it's done.
 - `lib/db_registry.py` — maps database names to connections via
   `data/db_registry.json`, so the executor doesn't hardcode anything.
 
-**Understanding the question (before the LLM sees it)**
+
 
 - `lib/collection_resolver.py` — reads dates out of the question ("last
   month", "Q1 2026", "16th April 2026") and picks the right monthly
@@ -80,12 +67,15 @@ faster and smarter once it's done.
   appConfigs collection name), routes the question to the right database(s),
   and later double-checks the query against those rules.
 
-**Building the prompt**
-
 - `lib/schemas.py` — the big static rulebook the LLM reads: output format,
   field names, timestamp units, safety rules.
 - `lib/schema_discovery.py` — samples real documents hourly so the prompt
   always reflects the actual current schema, not a stale description.
+- `lib/schema_watcher.py` — sits on top of a MongoDB change stream and
+  notices new/removed fields as they land, then triggers the same refresh
+  (rate-limited to once per hour). Turns the hourly poll into "hourly OR
+  when something actually changes." Requires a replica set; degrades
+  cleanly to the plain hourly sample on standalone clusters.
 - `lib/live_data_context.py` — feeds the prompt real values (actual country
   names, owner names, app names) so the model copies exact spellings.
 - `lib/data_digest.py` — slower-moving version of the same idea: a field +
@@ -97,8 +87,6 @@ faster and smarter once it's done.
   Ollama and search them by cosine similarity. Used by schema retrieval and
   example retrieval.
 
-**Generating and running the query**
-
 - `lib/llm_provider.py` — the Ollama HTTP client (JSON mode, warmup).
 - `lib/query_generator.py` — orchestrates everything above into one prompt,
   calls the model, validates the JSON it returns, and retries with an error
@@ -107,16 +95,12 @@ faster and smarter once it's done.
   stages, caps result sizes, 15-second timeout, accent-insensitive text
   matching, runs dual-database queries in parallel and merges them.
 
-**Checking and explaining the result**
-
 - `lib/response_validator.py` — deterministic sanity checks on the query and
   result (no LLM involved). Findings show up in the UI's VALIDATION tab.
 - `lib/accuracy_scorer.py` — folds five signals into a 0-100 confidence
   score shown next to every answer.
 - `lib/result_summarizer.py` — writes the plain-English summary of the
   results; chunks large result sets map-reduce style.
-
-**Learning from usage**
 
 - `lib/feedback_store.py` — handles thumbs up/down; good answers get
   promoted in the RAG store, corrected answers get saved with extra weight.
@@ -126,8 +110,6 @@ faster and smarter once it's done.
 - `lib/chat_history.py` / `lib/chat_sharing.py` — query history and
   shareable chat links, both written fire-and-forget.
 
-**Tooling and UI**
-
 - `scripts/evaluate.py` — replays the locked eval set against the running
   server and reports pass/fail with a delta vs. last run.
 - `scripts/propose_eval_set.py` — drafts new eval cases from the best RAG
@@ -135,7 +117,7 @@ faster and smarter once it's done.
 - `static/index.html` — the entire frontend: dark UI, voice input, result
   tabs, feedback buttons, trainer panel. One self-contained file.
 
-## Part 3 — From question to answer, step by step
+## Part 3 — Practical system working principle (From user input to the UI Output)
 
 Say you type: **"Top 5 countries by session count in April"**.
 
@@ -201,14 +183,18 @@ Say you type: **"Top 5 countries by session count in April"**.
     successful query is embedded into the RAG store, the examples that were
     shown in the prompt get a success bump, and the query lands in history.
 
-11. **The browser renders it**: the summary up top, then tabs for the raw
-    table, the generated pipeline, the validation findings, the accuracy
-    breakdown, and thumbs up/down — which feeds step 10 the next time.
+11. **The browser renders it**: the summary up top, then tabs for the
+    ready-to-run **mongosh command** (QUERY), the raw table, the JSON, the
+    generated pipeline, the validation findings, the accuracy breakdown,
+    and thumbs up/down — which feeds step 10 the next time. The QUERY tab
+    is the fastest way to sanity-check what the LLM produced: copy it, run
+    it in Compass or the shell, compare row counts against what the UI
+    showed.
 
 If the model fails all its retries, you get a readable error and an "Ask
 Again" button instead of a stack trace.
 
-## Part 4 — How the system works, in short
+## Part 4 — TLDR; How the system works
 
 The core trick is that the LLM is never trusted and never alone. It's
 **boxed in before** generation (the collection, the database routing, the

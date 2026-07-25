@@ -31,6 +31,9 @@ data/vectors/
 data/chroma/
 data/data_digest.json
 data/db_registry.json
+data/eval_report.json
+data/.eval_baseline.json
+data/eval_set.proposed.json
 
 # Editor / IDE
 .vscode/

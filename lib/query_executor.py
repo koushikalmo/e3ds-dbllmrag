@@ -1,13 +1,32 @@
+from __future__ import annotations
+import os
 import re
 import asyncio
 from typing import Any
 
 from lib.db_registry import get_db, get_default_collection
 
-MAX_RESULTS   = 200
 QUERY_TIMEOUT = 15_000  # ms
 
 _WRITE_STAGES = frozenset({"$out", "$merge"})
+
+# Stages that REDUCE the result set into summary rows. Their output is small
+# per row (counts, buckets), so we let the cap go higher.
+_REDUCE_STAGES = frozenset({"$group", "$bucket", "$bucketAuto", "$count", "$facet", "$sortByCount"})
+
+
+def _hard_limit_raw() -> int:
+    try:
+        return max(1, int(os.getenv("HARD_LIMIT_RAW", "200")))
+    except ValueError:
+        return 200
+
+
+def _hard_limit_agg() -> int:
+    try:
+        return max(1, int(os.getenv("HARD_LIMIT_AGG", "1000")))
+    except ValueError:
+        return 1000
 
 # These fields use regex matching so "Bogota" also finds "Bogotá"
 _PARTIAL_MATCH_FIELDS = frozenset({
@@ -100,10 +119,40 @@ def _sanitize_pipeline(pipeline: list) -> list:
 
 
 def _enforce_limit(pipeline: list) -> list:
-    has_limit = any("$limit" in s for s in pipeline)
-    if not has_limit:
-        return pipeline + [{"$limit": MAX_RESULTS}]
-    return [{"$limit": min(s["$limit"], MAX_RESULTS)} if "$limit" in s else s for s in pipeline]
+    """Cap result size. Tiered: raw heartbeat docs are ~5KB each so 200 is
+    plenty, but $group rows are tiny and 200 cuts off yearly histograms —
+    those get HARD_LIMIT_AGG (1000) instead. An existing $limit is kept if
+    it's under the cap, otherwise we clamp/append.
+    """
+    if not pipeline:
+        return pipeline
+
+    has_reduce = any(
+        isinstance(s, dict) and any(k in _REDUCE_STAGES for k in s)
+        for s in pipeline
+    )
+    cap = _hard_limit_agg() if has_reduce else _hard_limit_raw()
+
+    last     = pipeline[-1] if pipeline else None
+    last_op  = next(iter(last), None) if isinstance(last, dict) else None
+
+    if last_op == "$limit":
+        try:
+            existing = int(last["$limit"])
+        except (TypeError, ValueError):
+            existing = cap + 1
+        if existing > cap:
+            print(f"[executor] capped trailing $limit {existing} → {cap}")
+            pipeline = pipeline[:-1] + [{"$limit": cap}]
+        return pipeline
+
+    # Don't append $limit when the pipeline ends in $count — its single-row
+    # output is already minimal and a $limit afterwards is harmless but ugly.
+    if last_op == "$count":
+        return pipeline
+
+    print(f"[executor] appended safety $limit={cap} ({'agg' if has_reduce else 'raw'})")
+    return pipeline + [{"$limit": cap}]
 
 
 def _prepare_pipeline(pipeline: list) -> list:
@@ -153,7 +202,7 @@ async def _run_aggregate(database: str, collection: str, raw_pipeline: list) -> 
     print(f"[executor] aggregate {database}/{coll_name} ({len(pipeline)} stages)")
     try:
         cursor  = db[coll_name].aggregate(pipeline, allowDiskUse=True, maxTimeMS=QUERY_TIMEOUT)
-        results = await cursor.to_list(length=MAX_RESULTS)
+        results = await cursor.to_list(length=None)
         return _make_serializable(results)
     except Exception as err:
         _raise_friendly(err, database, coll_name)
@@ -179,8 +228,9 @@ async def _run_find(
     db        = _get_db(database)
     coll_name = _resolve_collection(database, collection)
     clean     = _normalize_match_query(query or {})
-    limit     = min(limit or 50, MAX_RESULTS)
-    print(f"[executor] find {database}/{coll_name} (limit={limit})")
+    cap       = _hard_limit_raw()
+    limit     = min(limit or 50, cap)
+    print(f"[executor] find {database}/{coll_name} (limit={limit}, cap={cap})")
     try:
         cursor = db[coll_name].find(clean, projection or {})
         if sort:
@@ -201,7 +251,7 @@ async def _run_distinct(
     print(f"[executor] distinct '{field}' {database}/{coll_name}")
     try:
         values = await db[coll_name].distinct(field, clean)
-        return [{"value": v} for v in values[:MAX_RESULTS] if v is not None]
+        return [{"value": v} for v in values if v is not None]
     except Exception as err:
         _raise_friendly(err, database, coll_name)
 

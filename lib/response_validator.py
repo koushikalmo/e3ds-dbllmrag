@@ -1,6 +1,8 @@
 from __future__ import annotations
 import json
 
+from lib.relationships import check_relationships
+
 
 def validate_query_and_result(
     query_obj:    dict,
@@ -11,6 +13,8 @@ def validate_query_and_result(
     qt        = query_obj.get("queryType", "single")
     operation = query_obj.get("operation", "aggregate")
     database  = query_obj.get("database", "")
+
+    checks.extend(check_relationships(query_obj))
 
     if operation == "countDocuments":
         checks.append(_pass("RESULT_COUNT", "countDocuments operation — exact count returned."))
@@ -23,13 +27,6 @@ def validate_query_and_result(
         ))
     else:
         checks.append(_pass("RESULT_COUNT", f"{result_count} record{'s' if result_count != 1 else ''} returned."))
-
-    if result_count >= 190:
-        checks.append(_warn(
-            "NEAR_LIMIT",
-            f"Result set hit the 200-document cap ({result_count} returned). "
-            "The true total is likely larger — use a $group + $count pipeline to get the real number.",
-        ))
 
     if database == "stream-datastore":
         if _has_employee_filter(query_obj):

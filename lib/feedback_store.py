@@ -1,6 +1,9 @@
+from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+
+from bson import ObjectId
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +20,15 @@ async def save_feedback(
     corrected_pipeline: list | None = None,
     auto_warnings:      list | None = None,
 ) -> str:
-    from lib.mongodb import get_stream_db
+    """Queue a feedback write and return immediately. The aux cluster can
+    stall inserts for tens of seconds, so the _id is generated locally and
+    the insert (plus the RAG follow-up) runs in background tasks.
+    """
+    doc_id_obj = ObjectId()
+    doc_id     = str(doc_id_obj)
 
     doc = {
+        "_id":                doc_id_obj,
         "session_id":         session_id,
         "question":           question,
         "query_obj":          query_obj,
@@ -32,25 +41,35 @@ async def save_feedback(
         "used_in_rag":        False,
     }
 
-    db     = get_stream_db()
-    # asyncio.shield so the write survives if the HTTP client disconnects
-    result = await asyncio.shield(db[FEEDBACK_COLLECTION].insert_one(doc))
-    doc_id = str(result.inserted_id)
+    asyncio.create_task(_persist_feedback(doc))
 
-    logger.info(f"[feedback] '{rating}' saved for: '{question[:60]}' (id={doc_id})")
+    # trainer saves already wrote their own trainer_gold RAG entry — running
+    # the normal pathway here would overwrite it with a weaker user_verified one
+    is_trainer_audit = (correction_note or "").startswith("TRAINER_GOLD:")
 
-    # Fire-and-forget RAG update — does not block the HTTP response
-    asyncio.create_task(
-        _process_feedback_for_rag(
-            doc_id             = doc_id,
-            rating             = rating,
-            question           = question,
-            query_obj          = query_obj,
-            result_count       = result_count,
-            corrected_pipeline = corrected_pipeline or [],
+    if not is_trainer_audit:
+        asyncio.create_task(
+            _process_feedback_for_rag(
+                doc_id             = doc_id,
+                rating             = rating,
+                question           = question,
+                query_obj          = query_obj,
+                result_count       = result_count,
+                corrected_pipeline = corrected_pipeline or [],
+            )
         )
-    )
+
+    logger.info(f"[feedback] '{rating}' queued for: '{question[:60]}' (id={doc_id})")
     return doc_id
+
+
+async def _persist_feedback(doc: dict) -> None:
+    from lib.mongodb import get_stream_db
+    try:
+        db = get_stream_db()
+        await db[FEEDBACK_COLLECTION].insert_one(doc)
+    except Exception as e:
+        logger.error(f"[feedback] background insert failed for id={doc.get('_id')}: {e}")
 
 
 async def _process_feedback_for_rag(
@@ -62,10 +81,26 @@ async def _process_feedback_for_rag(
     corrected_pipeline: list,
 ) -> None:
     from lib.mongodb import get_stream_db
-    from lib.query_examples import add_verified_example, add_corrected_example
+    from lib.query_examples import (
+        add_verified_example, add_corrected_example,
+        find_similar_examples_vector, bump_example,
+    )
 
     try:
         db_hint = _infer_db_hint(query_obj)
+
+        # bump the examples that would have been retrieved for this question
+        # (good = success, bad = failure). Has to run before add_*_example,
+        # otherwise the fresh entry we write below gets counted too.
+        try:
+            retrieved = await find_similar_examples_vector(question, db_hint, top_n=3)
+            for r in (retrieved or []):
+                ex_id = r.get("id")
+                if not ex_id:
+                    continue
+                bump_example(ex_id, success=(rating == "good"))
+        except Exception as e:
+            logger.error(f"[feedback] bump retrieved failed: {e}")
 
         if rating == "good":
             await add_verified_example(question, query_obj, result_count, db_hint)

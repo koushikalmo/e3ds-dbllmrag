@@ -26,7 +26,9 @@ python main.py
 ```
 
 Open http://localhost:8000 and ask something like *"top 5 countries by
-session count in April"*.
+session count in April"*. The result view has a **QUERY** tab that shows
+the exact `mongosh` command the LLM produced — copy it into MongoDB Compass
+or the shell if you want to double-check the pipeline by hand.
 
 ## What you need
 
@@ -69,6 +71,14 @@ curl http://localhost:8000/api/status    # is Ollama up, which model
 First startup is slower than usual — the server warms the model, samples the
 databases for live schema, and embeds the RAG examples in the background.
 The API works during warmup; queries just get smarter once it finishes.
+
+If the MongoDB cluster is a replica set (Atlas is, by default), a change-stream
+watcher also runs in the background. It notices new or removed fields as
+they land and refreshes the schema cache — at most once an hour — so the
+LLM's field list stays current without waiting for the next scheduled
+sample. On a standalone cluster the watcher logs a warning and steps
+aside; the hourly TTL sampling still runs. See `SETUP.md` §6.2 for the
+knobs.
 
 ## Checking that changes didn't break anything
 

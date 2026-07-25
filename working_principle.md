@@ -1,10 +1,4 @@
-# Working Principle
-
-How a plain-English question becomes a verified MongoDB result, and how the
-system trains itself to get better at it. Read `README.md` first if you just
-want to run the thing.
-
-## TLDR
+# Working Principle; TLDR
 
 You type a question in the browser. A local Ollama model turns it into a
 MongoDB aggregation pipeline. The backend sanitizes that pipeline (read-only,
@@ -47,12 +41,23 @@ requests immediately while they warm in the background:
    and top values (countries, owners, apps...) from MongoDB.
 4. `refresh_schema_cache()` (`lib/schema_discovery.py`) — samples live docs,
    extracts field paths + types, embeds them into the schema vector store.
-   Re-runs hourly.
-5. `index_all_examples_async()` (`lib/query_examples.py`) — embeds any RAG
+   Re-runs hourly as a baseline safety net.
+5. `start_schema_watcher()` (`lib/schema_watcher.py`) — opens a MongoDB
+   change stream on each database (via Motor's `db.watch()`). When an event
+   introduces a field the schema cache doesn't already know about, or drops
+   a collection, it flips a dirty flag. A separate refresher loop wakes
+   every `SCHEMA_WATCHER_WAKE_SEC` and, if dirty AND the
+   `SCHEMA_WATCHER_COOLDOWN_SEC` cooldown has expired, calls
+   `refresh_schema_cache(force=True)` — capped at one refresh per cooldown
+   window no matter how many events pile up. Boots strictly after (4) so
+   the "known paths" set is populated before the diff runs. Needs a replica
+   set; on a standalone it logs a warning and disables itself, and (4)
+   alone carries the load.
+6. `index_all_examples_async()` (`lib/query_examples.py`) — embeds any RAG
    example that doesn't have a vector yet.
-6. `start_digest_scheduler()` (`lib/data_digest.py`) — loads/refreshes the
+7. `start_digest_scheduler()` (`lib/data_digest.py`) — loads/refreshes the
    on-disk field digest, re-samples every 3 days.
-7. `_prune_scheduler()` (`lib/query_examples.py`) — prunes bad RAG examples
+8. `_prune_scheduler()` (`lib/query_examples.py`) — prunes bad RAG examples
    every 6 hours (first run delayed so it doesn't fight cache warming).
 
 ## Execution order 2 — one query, end to end
@@ -190,6 +195,7 @@ entries for human review.
 | `lib/schemas.py` | The big static system prompt + keyword routing sets |
 | `lib/relationships.py` | Join graph, classifier, relationship validators |
 | `lib/schema_discovery.py` | Hourly live schema sampling → vector store |
+| `lib/schema_watcher.py` | Change-stream watcher: detects new/removed fields in real time and triggers a debounced refresh (max once/hour) |
 | `lib/live_data_context.py` | Real sample docs + top values for the prompt |
 | `lib/data_digest.py` | 3-day field/value digest on disk |
 | `lib/collection_resolver.py` | Date phrases → month collection name |

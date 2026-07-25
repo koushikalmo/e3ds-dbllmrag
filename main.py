@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import time
 import asyncio
@@ -6,7 +7,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,35 +19,37 @@ from lib.query_executor     import execute_query
 from lib.result_summarizer  import summarize_results
 from lib.llm_provider       import OllamaProvider, OLLAMA_MODEL, warmup_model
 from lib.schema_discovery   import refresh_schema_cache, get_cache_status
+from lib.schema_watcher     import start_schema_watcher, get_watcher_status
 from lib.live_data_context  import warm_all_caches, get_cache_status as get_live_cache_status
-from lib.query_examples     import get_example_count
+from lib.query_examples     import (
+    get_example_count, index_all_examples_async,
+    bump_example, rag_stats, prune_examples, _prune_scheduler,
+    migrate_phase4_metadata,
+)
 from lib.chat_history       import save_query, get_history, delete_entry, clear_all
 from lib.chat_sharing       import create_share, get_share
-from lib.query_examples     import index_all_examples_async
 from lib.session_memory     import add_turn, get_context_text, clear_session, active_session_count
 from lib.collection_resolver import resolve_and_log, resolve_year
 from lib.query_executor     import get_existing_year_collections, build_year_pipeline
 from lib.response_validator import validate_query_and_result
+from lib.accuracy_scorer    import score_query
 from lib.feedback_store     import save_feedback, get_feedback_stats
 from lib.data_digest        import start_digest_scheduler, get_digest_status, refresh_digest
-from lib.vector_store       import _get_client as _get_chroma_client
+from lib                    import trainer
 
 
-def _chroma_status() -> dict:
+# Populate the schema cache before starting the watcher — otherwise the
+# very first change event has nothing to diff against and would trigger a
+# redundant refresh.
+async def _boot_schema_pipeline(default_collection: str) -> None:
     try:
-        client = _get_chroma_client()
-        if client is None:
-            return {"status": "unavailable", "collections": []}
-        cols = client.list_collections()
-        return {
-            "status":      "ok",
-            "collections": [
-                {"name": c.name, "count": c.count()}
-                for c in cols
-            ],
-        }
+        await refresh_schema_cache(stream_collection=default_collection)
     except Exception as e:
-        return {"status": "error", "error": str(e)[:200]}
+        print(f"[startup] initial schema refresh failed (non-fatal): {e}")
+    try:
+        await start_schema_watcher(default_collection)
+    except Exception as e:
+        print(f"[startup] schema watcher failed to start (non-fatal): {e}")
 
 
 @asynccontextmanager
@@ -62,11 +65,16 @@ async def lifespan(app: FastAPI):
     print(f"  RAG examples: {get_example_count()} in store")
     print("═" * 56)
 
+    # old RAG entries have no timestamps, which makes the age-decay treat them
+    # as ancient and the pruner delete them. Stamp them once here (idempotent).
+    migrate_phase4_metadata()
+
     asyncio.create_task(warmup_model())
     asyncio.create_task(warm_all_caches(default_collection))
-    asyncio.create_task(refresh_schema_cache(stream_collection=default_collection))
+    asyncio.create_task(_boot_schema_pipeline(default_collection))
     asyncio.create_task(index_all_examples_async())
     asyncio.create_task(start_digest_scheduler())
+    asyncio.create_task(_prune_scheduler())
 
     yield
 
@@ -117,6 +125,28 @@ class FeedbackRequest(BaseModel):
     corrected_pipeline: list = Field([],  description="User-supplied corrected pipeline JSON")
 
 
+class TrainLoginRequest(BaseModel):
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+class TrainRunRequest(BaseModel):
+    session_id:         str  = Field("",   description="Frontend session UUID")
+    question:           str  = Field(...,  min_length=1, max_length=500)
+    original_query:     dict = Field(...,  description="The query_obj the LLM first produced")
+    corrected_pipeline: list = Field(...,  description="Pipeline JSON the trainer edited")
+    collection:         str  = Field("",   description="Override collection (stream-datastore)")
+
+
+class TrainSaveRequest(BaseModel):
+    session_id:         str  = Field("",   description="Frontend session UUID")
+    question:           str  = Field(...,  min_length=1, max_length=500)
+    original_query:     dict = Field(...,  description="Original query_obj from LLM (kept for audit)")
+    corrected_pipeline: list = Field(...,  description="Pipeline JSON the trainer edited")
+    collection:         str  = Field("",   description="Override collection")
+    result_count:       int  = Field(0,    ge=0)
+    eval_tags:          list = Field([],   description="Optional free-form tags")
+
+
 @app.get("/", include_in_schema=False)
 async def serve_frontend():
     return FileResponse("static/index.html")
@@ -136,7 +166,6 @@ async def health_check():
             "rag_examples":  get_example_count(),
             "feedback":      feedback_stats,
             "data_digest":   get_digest_status(),
-            "vector_db":     _chroma_status(),
             "time":          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         },
         status_code=200 if all_ok else 503,
@@ -154,7 +183,6 @@ async def llm_status():
         "schema_cache": get_cache_status(),
         "live_context": get_live_cache_status(),
         "rag_examples": get_example_count(),
-        "vector_db":    _chroma_status(),
     })
 
 
@@ -172,8 +200,10 @@ async def run_query(body: QueryRequest):
             collection       = collection,
             conversation_ctx = conversation_ctx,
         )
+        # internal bookkeeping field — pop it before it can leak into the response
+        retrieved_example_ids = query_obj.pop("_retrieved_example_ids", []) or []
 
-        # Year query: expand single-collection pipeline across all months via $unionWith
+        # whole-year question? union the pipeline across every month collection
         year = resolve_year(body.question.strip())
         if (
             year
@@ -204,7 +234,7 @@ async def run_query(body: QueryRequest):
 
         elapsed = round(time.perf_counter() - start, 2)
 
-        # Build query plan summary for frontend PIPELINE tab
+        # summary for the PIPELINE tab in the UI
         query_plan = None
         qt = query_obj.get("queryType")
         if qt == "single":
@@ -237,7 +267,20 @@ async def run_query(body: QueryRequest):
 
         validation_warnings = validate_query_and_result(query_obj, result, result_count)
 
-        # Extract LLM transparency fields (may be absent on old Ollama builds)
+        try:
+            accuracy_breakdown = await score_query(
+                question         = body.question.strip(),
+                query_obj        = query_obj,
+                result           = result,
+                result_count     = result_count,
+                validator_checks = validation_warnings,
+            )
+            accuracy = accuracy_breakdown.to_dict()
+        except Exception as e:
+            print(f"[/api/query] Accuracy scoring failed (non-fatal): {e}")
+            accuracy = {"score": None, "tier": "unknown", "signals": {}}
+
+        # the model doesn't always fill these in, so sanitize
         assumptions = query_obj.get("assumptions", [])
         if not isinstance(assumptions, list):
             assumptions = []
@@ -245,7 +288,7 @@ async def run_query(body: QueryRequest):
         if confidence not in ("high", "medium", "low"):
             confidence = "medium"
 
-        # Build a lightweight query-metadata object the frontend sends back for feedback
+        # the frontend echoes this back with thumbs up/down feedback
         query_meta = {
             "queryType":  query_obj.get("queryType"),
             "database":   query_obj.get("database"),
@@ -262,8 +305,21 @@ async def run_query(body: QueryRequest):
                     body.question.strip(),
                     f"Returned {result_count} results — '{query_obj.get('resultLabel', 'Results')}'",
                 )
-            save_successful_query(body.question.strip(), query_obj, result_count)
-            # Save to chat history in background — don't await (would block the response)
+            save_successful_query(
+                body.question.strip(),
+                query_obj,
+                result_count,
+                accuracy_score = accuracy.get("score"),
+            )
+            # reward the examples that were shown in the prompt. Failures get
+            # recorded on the bad-feedback path in feedback_store, not here.
+            acc_score = accuracy.get("score") if isinstance(accuracy, dict) else None
+            for ex_id in retrieved_example_ids:
+                try:
+                    bump_example(ex_id, success=True, accuracy=acc_score)
+                except Exception as e:
+                    print(f"[/api/query] bump_example failed for {ex_id[:8]}: {e}")
+            # history write goes to the aux cluster which can stall — never await it
             asyncio.create_task(save_query(
                 question        = body.question.strip(),
                 collection      = collection,
@@ -283,6 +339,7 @@ async def run_query(body: QueryRequest):
                 "assumptions":       assumptions,
                 "confidence":        confidence,
                 "validationWarnings": validation_warnings,
+                "accuracy":          accuracy,
                 "queryMeta":         query_meta,
                 "meta": {
                     "question":       body.question.strip(),
@@ -354,6 +411,228 @@ async def refresh_digest_endpoint():
     return JSONResponse(content={"success": True, "data_digest": get_digest_status()})
 
 
+@app.post("/api/eval/run")
+async def trigger_eval_run():
+    # runs scripts/evaluate.py as a subprocess against this server, in the background
+    import asyncio, json
+    from pathlib import Path
+
+    target = f"http://127.0.0.1:{os.getenv('PORT', '8000')}"
+    script = Path(__file__).parent / "scripts" / "evaluate.py"
+
+    async def _runner():
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "python3", str(script), "--url", target,
+                cwd    = str(Path(__file__).parent),
+                stdout = asyncio.subprocess.PIPE,
+                stderr = asyncio.subprocess.PIPE,
+            )
+            out, err = await proc.communicate()
+            print(f"[/api/eval/run] finished rc={proc.returncode}")
+            if err:
+                print(f"[/api/eval/run] stderr: {err.decode()[:500]}")
+        except Exception as e:
+            print(f"[/api/eval/run] failed: {e}")
+
+    asyncio.create_task(_runner())
+    return JSONResponse(content={"success": True, "message": "Eval run started in background."})
+
+
+@app.get("/api/eval/baseline")
+async def get_eval_baseline():
+    # last finished eval report, 404 if none yet
+    import json
+    from pathlib import Path
+    report_path = Path(__file__).parent / "data" / "eval_report.json"
+    if not report_path.exists():
+        return JSONResponse(
+            content={"success": False, "error": "No eval report found. Run POST /api/eval/run first."},
+            status_code=404,
+        )
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        return JSONResponse(content={"success": True, "data": report})
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"Failed to read report: {e}"}, status_code=500)
+
+
+# trainer mode: password-gated pipeline editor + gold-example saver
+def _trainer_auth(request) -> tuple[bool, JSONResponse | None]:
+    """Returns (ok, error_response) — error_response is ready to send as-is."""
+    if not trainer.is_enabled():
+        return False, JSONResponse(
+            content={"success": False, "error": "Trainer disabled. Set TRAINER_PASSWORD in .env to enable."},
+            status_code=403,
+        )
+    token = trainer.extract_bearer(request.headers.get("authorization"))
+    if not trainer.verify_token(token):
+        return False, JSONResponse(
+            content={"success": False, "error": "Invalid or expired trainer token. Re-login."},
+            status_code=401,
+        )
+    return True, None
+
+
+@app.get("/api/train/status")
+async def trainer_status():
+    return JSONResponse(content={
+        "success": True,
+        "enabled": trainer.is_enabled(),
+    })
+
+
+@app.post("/api/train/login")
+async def trainer_login(body: TrainLoginRequest):
+    if not trainer.is_enabled():
+        return JSONResponse(
+            content={"success": False, "error": "Trainer disabled. Set TRAINER_PASSWORD in .env."},
+            status_code=403,
+        )
+    if not trainer.verify_password(body.password):
+        return JSONResponse(
+            content={"success": False, "error": "Incorrect password."},
+            status_code=401,
+        )
+    token = trainer.issue_token()
+    return JSONResponse(content={
+        "success":    True,
+        "token":      token,
+        "expires_in": trainer.TOKEN_TTL_SEC,
+    })
+
+
+@app.post("/api/train/logout")
+async def trainer_logout(request: Request):
+    token = trainer.extract_bearer(request.headers.get("authorization"))
+    trainer.revoke_token(token)
+    return JSONResponse(content={"success": True})
+
+
+@app.post("/api/train/run")
+async def trainer_run(body: TrainRunRequest, request: Request):
+    from lib.query_executor    import execute_query
+    from lib.response_validator import validate_query_and_result
+
+    ok, err = _trainer_auth(request)
+    if not ok:
+        return err
+
+    try:
+        corrected = trainer.build_corrected_query(
+            body.original_query,
+            body.corrected_pipeline,
+            collection=body.collection or None,
+        )
+    except ValueError as e:
+        return JSONResponse(
+            content={"success": False, "error": f"invalid pipeline: {e}"},
+            status_code=400,
+        )
+
+    try:
+        result = await execute_query(corrected)
+    except TimeoutError as e:
+        return JSONResponse(content={"success": False, "error": f"timeout: {e}"}, status_code=504)
+    except Exception as e:
+        import traceback
+        print(f"[/api/train/run] execution failed:\n{traceback.format_exc()}")
+        return JSONResponse(content={"success": False, "error": f"execution failed: {str(e)[:300]}"}, status_code=400)
+
+    rows = result.get("results", [])
+    if isinstance(rows, dict):
+        rows = rows.get("merged") or rows.get("primary") or []
+    result_count = len(rows) if isinstance(rows, list) else 0
+
+    checks = validate_query_and_result(corrected, result, result_count)
+
+    try:
+        breakdown = await score_query(
+            question         = body.question.strip(),
+            query_obj        = corrected,
+            result           = result,
+            result_count     = result_count,
+            validator_checks = checks,
+        )
+        accuracy = breakdown.to_dict()
+    except Exception as e:
+        print(f"[/api/train/run] scoring failed (non-fatal): {e}")
+        accuracy = {"score": None, "tier": "unknown", "signals": {}}
+
+    return JSONResponse(content={
+        "success": True,
+        "data": {
+            "correctedQuery":     corrected,
+            "result":             result,
+            "resultCount":        result_count,
+            "validationWarnings": checks,
+            "accuracy":           accuracy,
+        },
+    })
+
+
+@app.post("/api/train/save")
+async def trainer_save(body: TrainSaveRequest, request: Request):
+    ok, err = _trainer_auth(request)
+    if not ok:
+        return err
+
+    try:
+        corrected = trainer.build_corrected_query(
+            body.original_query,
+            body.corrected_pipeline,
+            collection=body.collection or None,
+        )
+    except ValueError as e:
+        return JSONResponse(
+            content={"success": False, "error": f"invalid pipeline: {e}"},
+            status_code=400,
+        )
+
+    try:
+        ids = await trainer.save_as_gold(
+            session_id      = body.session_id,
+            question        = body.question.strip(),
+            corrected_query = corrected,
+            result_count    = body.result_count,
+            eval_tags       = body.eval_tags,
+        )
+    except Exception as e:
+        import traceback
+        print(f"[/api/train/save] save failed:\n{traceback.format_exc()}")
+        return JSONResponse(content={"success": False, "error": f"save failed: {str(e)[:300]}"}, status_code=500)
+
+    return JSONResponse(content={"success": True, "data": ids})
+
+
+@app.get("/api/train/list")
+async def trainer_list(request: Request):
+    ok, err = _trainer_auth(request)
+    if not ok:
+        return err
+    return JSONResponse(content={"success": True, "data": trainer.list_gold()})
+
+
+@app.get("/api/rag/stats")
+async def rag_stats_endpoint():
+    try:
+        return JSONResponse(content={"success": True, "data": rag_stats()})
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"stats failed: {e}"}, status_code=500)
+
+
+class RagPruneRequest(BaseModel):
+    dry_run: bool = Field(True, description="When true, report what would be removed without deleting")
+
+
+@app.post("/api/rag/prune")
+async def rag_prune_endpoint(body: RagPruneRequest):
+    try:
+        return JSONResponse(content={"success": True, "data": prune_examples(dry_run=body.dry_run)})
+    except Exception as e:
+        return JSONResponse(content={"success": False, "error": f"prune failed: {e}"}, status_code=500)
+
+
 @app.post("/api/schema/refresh")
 async def refresh_schema():
     collection = os.getenv("DEFAULT_STREAM_COLLECTION", "Apr_2026")
@@ -365,6 +644,15 @@ async def refresh_schema():
         "success":      True,
         "schema_cache": get_cache_status(),
         "live_context": get_live_cache_status(),
+    })
+
+
+@app.get("/api/schema/watcher")
+async def schema_watcher_status():
+    return JSONResponse(content={
+        "success": True,
+        "watcher": get_watcher_status(),
+        "schema_cache": get_cache_status(),
     })
 
 

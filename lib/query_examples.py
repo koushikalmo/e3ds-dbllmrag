@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import json
 import logging
@@ -260,6 +261,45 @@ def _tokenize(text: str) -> set[str]:
     return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) > 2 and w not in stopwords}
 
 
+# cap on the effective-weight multiplier, otherwise a good example keeps
+# boosting itself through its own accuracy updates and drowns out everything
+_EFFECTIVE_WEIGHT_CAP = 5.0
+
+
+def _days_since(iso_ts: str | None) -> float:
+    if not iso_ts:
+        return 10_000.0  # treat unknown as ancient
+    try:
+        dt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return 10_000.0
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = datetime.now(timezone.utc) - dt
+    return delta.total_seconds() / 86400.0
+
+
+def effective_weight(m: dict) -> float:
+    base     = float(m.get("weight", 1.0))
+
+    s        = int(m.get("success_count", 0))
+    f        = int(m.get("failure_count", 0))
+    rate     = (s + 1) / (s + f + 2)                  # Laplace-smoothed ∈ (0, 1)
+
+    a_sum    = float(m.get("accuracy_sum", 0.0))
+    a_n      = int(m.get("accuracy_n", 0))
+    acc_mean = (a_sum + 50) / (a_n + 1) / 100.0       # Laplace-smoothed ∈ (0, 1)
+
+    age_days = _days_since(m.get("last_used") or m.get("created_at") or m.get("timestamp"))
+    if   age_days <  30: decay = 1.0
+    elif age_days <  90: decay = 0.9
+    elif age_days < 180: decay = 0.75
+    else:                decay = 0.5
+
+    weighted = base * (0.5 + rate) * (0.5 + acc_mean) * decay
+    return min(weighted, _EFFECTIVE_WEIGHT_CAP)
+
+
 async def find_similar_examples_vector(question: str, db_hint: str = "stream", top_n: int = TOP_N) -> list[dict] | None:
     from lib.embeddings   import embed
     from lib.vector_store import VectorStore
@@ -276,28 +316,201 @@ async def find_similar_examples_vector(question: str, db_hint: str = "stream", t
         hint = item["metadata"].get("db_hint", "stream")
         return hint == db_hint or hint == "both" or db_hint == "both"
 
-    # wider pool so high-weight items can surface past lower-scoring but newer ones
+    # pull a wider pool so a high-weight older example can beat a newer one
     candidates = store.search(q_emb, top_k=top_n * 4, filter_fn=_filter, min_score=0.3)
     if not candidates:
         return None
 
+    # rank by cosine similarity x effective weight
     weighted = sorted(
         candidates,
-        key=lambda r: r["score"] * r["metadata"].get("weight", 1.0),
+        key=lambda r: r["score"] * effective_weight(r["metadata"]),
         reverse=True,
     )
     top_results = weighted[:top_n]
 
     return [
         {
-            "question":     r["text"],
-            "query":        r["metadata"].get("query", {}),
-            "result_count": r["metadata"].get("result_count", 0),
-            "db_hint":      r["metadata"].get("db_hint", "stream"),
-            "weight":       r["metadata"].get("weight", 1.0),
+            "id":               r["id"],
+            "question":         r["text"],
+            "query":            r["metadata"].get("query", {}),
+            "result_count":     r["metadata"].get("result_count", 0),
+            "db_hint":          r["metadata"].get("db_hint", "stream"),
+            "weight":           r["metadata"].get("weight", 1.0),
+            "effective_weight": round(effective_weight(r["metadata"]), 3),
         }
         for r in top_results
     ]
+
+
+def bump_example(example_id: str, *, success: bool, accuracy: int | None = None) -> bool:
+    from lib.vector_store import VectorStore
+    return VectorStore("examples").bump(example_id, success=success, accuracy=accuracy)
+
+
+def rag_stats(top_n: int = 10) -> dict:
+    # snapshot of the example store for the admin stats endpoint
+    from lib.vector_store import VectorStore
+    store  = VectorStore("examples")
+    items  = store.all_items()
+    total  = len(items)
+    if total == 0:
+        return {"total": 0, "by_source": {}, "avg_weight": 0.0, "avg_accuracy": 0.0,
+                "top_10": [], "bottom_10": [], "stale": 0}
+
+    by_source: dict[str, int] = {}
+    weight_sum   = 0.0
+    acc_sum_all  = 0.0
+    acc_n_all    = 0
+    stale        = 0
+    ranked: list[tuple[float, dict]] = []
+
+    for it in items:
+        m   = it.get("metadata", {}) or {}
+        src = m.get("source", "auto")
+        by_source[src] = by_source.get(src, 0) + 1
+
+        weight_sum  += float(m.get("weight", 1.0))
+        acc_sum_all += float(m.get("accuracy_sum", 0.0))
+        acc_n_all   += int(m.get("accuracy_n", 0))
+
+        if _days_since(m.get("last_used") or m.get("created_at") or m.get("timestamp")) > 90:
+            stale += 1
+
+        ew = effective_weight(m)
+        ranked.append((ew, {
+            "id":               it.get("id", ""),
+            "question":         (it.get("text") or "")[:120],
+            "source":           src,
+            "weight":           float(m.get("weight", 1.0)),
+            "effective_weight": round(ew, 3),
+            "success_count":    int(m.get("success_count", 0)),
+            "failure_count":    int(m.get("failure_count", 0)),
+            "accuracy_n":       int(m.get("accuracy_n", 0)),
+            "accuracy_mean":    round((float(m.get("accuracy_sum", 0.0)) / int(m.get("accuracy_n", 0)))
+                                      if int(m.get("accuracy_n", 0)) > 0 else 0.0, 1),
+            "last_used":        m.get("last_used") or m.get("created_at") or m.get("timestamp"),
+        }))
+
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    top    = [r[1] for r in ranked[:top_n]]
+    bottom = [r[1] for r in ranked[-top_n:][::-1]]
+
+    avg_acc = round(acc_sum_all / acc_n_all, 1) if acc_n_all > 0 else 0.0
+
+    return {
+        "total":        total,
+        "by_source":    by_source,
+        "avg_weight":   round(weight_sum / total, 3),
+        "avg_accuracy": avg_acc,
+        "stale":        stale,
+        "top_10":       top,
+        "bottom_10":    bottom,
+    }
+
+
+def prune_examples(dry_run: bool = False) -> dict:
+    """Drop stale or repeatedly-failing examples. First matching rule wins:
+    trainer_gold never goes; user_verified only after a year unused; auto
+    entries go after 3 failures with no success, 180 days unused with no
+    success, or 5+ accuracy samples averaging under 40.
+    """
+    from lib.vector_store import VectorStore
+    store = VectorStore("examples")
+    items = list(store.all_items())   # snapshot — we mutate via remove()
+
+    removed: list[dict] = []
+    kept                = 0
+
+    def _verdict(m: dict) -> tuple[str, str | None]:
+        src       = m.get("source", "auto")
+        last_used = m.get("last_used") or m.get("created_at") or m.get("timestamp")
+        s         = int(m.get("success_count", 0))
+        f         = int(m.get("failure_count", 0))
+        a_n       = int(m.get("accuracy_n", 0))
+        a_mean    = (float(m.get("accuracy_sum", 0.0)) / a_n) if a_n > 0 else 0.0
+
+        if src == "trainer_gold":
+            return ("keep", "trainer_gold")
+        if src == "user_verified" and _days_since(last_used) > 365:
+            return ("remove", "verified_but_unused_>365d")
+        if f >= 3 and s == 0:
+            return ("remove", "failures_without_successes")
+        if _days_since(last_used) > 180 and s == 0:
+            return ("remove", "unused_>180d_no_success")
+        if a_n >= 5 and a_mean < 40:
+            return ("remove", "low_accuracy_after_evidence")
+        return ("keep", None)
+
+    for it in items:
+        m = it.get("metadata", {}) or {}
+        verdict, reason = _verdict(m)
+        if verdict == "remove":
+            entry = {
+                "id":       it.get("id", ""),
+                "question": (it.get("text") or "")[:100],
+                "source":   m.get("source", "auto"),
+                "reason":   reason,
+            }
+            removed.append(entry)
+            if not dry_run:
+                store.remove(it["id"])
+        else:
+            kept += 1
+
+    if not dry_run and removed:
+        # keep query_examples.json in sync with the vector store
+        removed_questions = {entry["question"] for entry in removed}
+        local = _load_examples()
+        filtered = [
+            e for e in local
+            if (e.get("question") or "")[:100] not in removed_questions
+        ]
+        if len(filtered) != len(local):
+            _save_examples(filtered)
+
+    logger.info(f"[prune] {'dry-run ' if dry_run else ''}removed={len(removed)} kept={kept}")
+    return {"removed": len(removed), "kept": kept, "dry_run": dry_run, "details": removed}
+
+
+def migrate_phase4_metadata() -> int:
+    """One-off stamp for entries created before timestamps existed. Without it
+    the age-decay treats them as ancient and the pruner deletes them. Skips
+    anything that already has created_at, so it's safe on every startup.
+    """
+    from lib.vector_store import VectorStore
+    store = VectorStore("examples")
+    now   = datetime.now(timezone.utc).isoformat()
+    migrated = 0
+    for it in store.all_items():
+        m = it.setdefault("metadata", {})
+        if "created_at" in m and "last_used" in m:
+            continue
+        m.setdefault("created_at",    m.get("timestamp") or now)
+        m.setdefault("last_used",     m.get("timestamp") or now)
+        m.setdefault("success_count", 0)
+        m.setdefault("failure_count", 0)
+        m.setdefault("accuracy_sum",  0.0)
+        m.setdefault("accuracy_n",    0)
+        migrated += 1
+    if migrated:
+        store._save()
+        logger.info(f"[migrate_phase4] stamped {migrated} legacy entries with timestamps")
+    return migrated
+
+
+async def _prune_scheduler(interval_seconds: int = 6 * 3600) -> None:
+    # background prune loop, started from the lifespan hook in main.py
+    import asyncio
+    # don't prune right at startup — it competes with cache warming
+    await asyncio.sleep(interval_seconds)
+    while True:
+        try:
+            result = prune_examples(dry_run=False)
+            logger.info(f"[prune_scheduler] removed={result['removed']} kept={result['kept']}")
+        except Exception as e:
+            logger.error(f"[prune_scheduler] failed: {e}")
+        await asyncio.sleep(interval_seconds)
 
 
 def find_similar_examples(question: str, db_hint: str = "stream", top_n: int = TOP_N) -> list[dict]:
@@ -321,7 +534,13 @@ def find_similar_examples(question: str, db_hint: str = "stream", top_n: int = T
     return [ex for _, ex in scored[:top_n]]
 
 
-def add_example(question: str, query_obj: dict, result_count: int, db_hint: str = "stream") -> None:
+def add_example(
+    question:       str,
+    query_obj:      dict,
+    result_count:   int,
+    db_hint:        str        = "stream",
+    accuracy_score: int | None = None,
+) -> None:
     if result_count == 0:
         return
 
@@ -333,25 +552,30 @@ def add_example(question: str, query_obj: dict, result_count: int, db_hint: str 
 
     new_example = {
         "question": question, "query": query_obj,
-        "result_count": result_count,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "db_hint": db_hint,
+        "result_count":   result_count,
+        "timestamp":      datetime.now(timezone.utc).isoformat(),
+        "db_hint":        db_hint,
+        "accuracy_score": accuracy_score,
     }
     examples = _load_examples()
     examples.insert(0, new_example)
     _save_examples(examples)
 
     import asyncio
-    asyncio.create_task(_index_example_async(question, query_obj, result_count, db_hint))
+    asyncio.create_task(_index_example_async(
+        question, query_obj, result_count, db_hint,
+        accuracy_score=accuracy_score,
+    ))
 
 
 async def _index_example_async(
-    question:     str,
-    query_obj:    dict,
-    result_count: int,
-    db_hint:      str,
-    weight:       float = 1.0,  # 1.0=auto, 2.0=user verified, 2.5=user corrected
-    source:       str   = "auto",
+    question:       str,
+    query_obj:      dict,
+    result_count:   int,
+    db_hint:        str,
+    weight:         float      = 1.0,  # 1.0=auto, 2.0=user verified, 2.5=user corrected
+    source:         str        = "auto",
+    accuracy_score: int | None = None,
 ) -> None:
     import hashlib
     from lib.embeddings   import embed
@@ -361,17 +585,32 @@ async def _index_example_async(
     if emb is None:
         return
 
-    store = VectorStore("examples")
+    store   = VectorStore("examples")
+    item_id = hashlib.sha1(question.encode()).hexdigest()
+    now     = datetime.now(timezone.utc).isoformat()
+
+    # upsert: keep the success/failure counters if this question already exists
+    prev = next((i for i in store.all_items() if i["id"] == item_id), None)
+    prev_meta = (prev or {}).get("metadata", {}) if prev else {}
+
     store.upsert(
-        id        = hashlib.sha1(question.encode()).hexdigest(),
+        id        = item_id,
         text      = question,
         embedding = emb,
         metadata  = {
-            "query":        query_obj,
-            "result_count": result_count,
-            "db_hint":      db_hint,
-            "weight":       weight,
-            "source":       source,
+            "query":          query_obj,
+            "result_count":   result_count,
+            "db_hint":        db_hint,
+            "weight":         weight,
+            "source":         source,
+            "accuracy_score": accuracy_score,
+            "created_at":     prev_meta.get("created_at", now),
+            "last_used":      prev_meta.get("last_used", now),
+            "last_good_at":   prev_meta.get("last_good_at"),
+            "success_count":  int(prev_meta.get("success_count", 0)),
+            "failure_count": int(prev_meta.get("failure_count", 0)),
+            "accuracy_sum":  float(prev_meta.get("accuracy_sum", 0.0)),
+            "accuracy_n":    int(prev_meta.get("accuracy_n", 0)),
         },
     )
     store.trim_to(MAX_EXAMPLES)
@@ -408,6 +647,39 @@ async def add_verified_example(question: str, query_obj: dict, result_count: int
     await _index_example_async(question, query_obj, result_count, db_hint, weight=2.0, source="user_verified")
 
 
+async def add_trainer_gold_example(
+    question:     str,
+    query_obj:    dict,
+    result_count: int,
+    db_hint:      str = "stream",
+) -> str:
+    """Trainer-authored gold example: weight 3.0. The JSON write is quick and
+    happens inline; the embedding takes seconds so it's pushed to a background
+    task. Returns the sha1 id of the entry.
+    """
+    import asyncio, hashlib
+    new_example = {
+        "question":     question,
+        "query":        query_obj,
+        "result_count": result_count,
+        "timestamp":    datetime.now(timezone.utc).isoformat(),
+        "db_hint":      db_hint,
+        "weight":       3.0,
+        "source":       "trainer_gold",
+    }
+    examples = _load_examples()
+    q_tokens = _tokenize(question)
+    examples = [e for e in examples if _tokenize(e.get("question", "")) != q_tokens]
+    examples.insert(0, new_example)
+    _save_examples(examples)
+
+    asyncio.create_task(_index_example_async(
+        question, query_obj, result_count, db_hint,
+        weight=3.0, source="trainer_gold",
+    ))
+    return hashlib.sha1(question.encode()).hexdigest()
+
+
 async def add_corrected_example(question: str, query_obj: dict, result_count: int, db_hint: str = "stream") -> None:
     new_example = {
         "question":     question,
@@ -419,7 +691,7 @@ async def add_corrected_example(question: str, query_obj: dict, result_count: in
         "source":       "user_corrected",
     }
     examples = _load_examples()
-    # Replace existing entry for this question if present
+    # replace any older entry for the same question
     examples = [e for e in examples if _tokenize(e.get("question", "")) != _tokenize(question)]
     examples.insert(0, new_example)
     _save_examples(examples)

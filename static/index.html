@@ -43,10 +43,10 @@
     @keyframes spin   { to{transform:rotate(360deg)} }
     @keyframes blink  { 0%,100%{opacity:1} 50%{opacity:0} }
 
-    /* ── App shell ───────────────────────────────────────────── */
+    /* App shell */
     #app { display: flex; flex-direction: column; height: 100vh; }
 
-    /* ── Header ──────────────────────────────────────────────── */
+    /* Header */
     header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 1.25rem 0 1rem; border-bottom: 1px solid var(--border);
@@ -88,7 +88,7 @@
     }
     .hamburger:hover { background: var(--bg2); }
 
-    /* ── Workspace ───────────────────────────────────────────── */
+    /* Workspace */
     .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
 
     /* Sidebar overlay (mobile) */
@@ -98,7 +98,7 @@
     }
     .sidebar-overlay.open { display: block; }
 
-    /* ── Sidebar ─────────────────────────────────────────────── */
+    /* Sidebar */
     .sidebar {
       width: var(--sidebar); flex-shrink: 0;
       background: var(--bg2); border-right: 1px solid var(--border);
@@ -150,7 +150,7 @@
       color: var(--dimmer); font-size: 11px; line-height: 1.9;
     }
 
-    /* ── Chat area ───────────────────────────────────────────── */
+    /* Chat area */
     .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); min-width: 0; }
 
     /* Share banner */
@@ -166,14 +166,14 @@
     }
     .share-banner-close:hover { color: var(--text); }
 
-    /* ── Messages scroll container ───────────────────────────── */
+    /* Messages scroll container */
     .messages-wrap { flex: 1; overflow-y: auto; }
     .messages {
       max-width: 860px; margin: 0 auto; padding: 1.75rem 1.5rem 1rem;
       display: flex; flex-direction: column; gap: 1.75rem;
     }
 
-    /* ── Welcome state ───────────────────────────────────────── */
+    /* Welcome state */
     .welcome-state {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       flex: 1; padding: 3rem 2rem; text-align: center;
@@ -188,7 +188,7 @@
     }
     .example-chip:hover { background: var(--bg3); border-color: var(--accent); color: var(--accent); }
 
-    /* ── Individual message ──────────────────────────────────── */
+    /* Individual message */
     .msg { animation: fadeUp .2s ease; }
 
     /* User bubble */
@@ -233,7 +233,7 @@
     }
     .msg-error-label { font-weight: 700; color: var(--red); }
 
-    /* ── AI summary (main response text) ────────────────────── */
+    /* AI summary (main response text) */
     .ai-summary {
       font-size: 13.5px; line-height: 1.8; color: var(--text);
       padding: .25rem 0 .75rem;
@@ -250,7 +250,7 @@
     }
     .ai-summary h3 { font-size: 13px; font-weight: 700; margin: .75rem 0 .35rem; color: var(--accent); }
 
-    /* ── Collapsible raw data section ────────────────────────── */
+    /* Collapsible raw data section */
     .raw-data-toggle {
       display: flex; align-items: center; gap: .5rem; cursor: pointer;
       color: var(--dim); font-size: 11px; padding: .5rem 0; border: none;
@@ -312,7 +312,7 @@
     .page-btn:hover:not(:disabled) { border-color: var(--border2); color: var(--text); background: var(--bg3); }
     .page-btn:disabled { opacity: .3; cursor: default; }
 
-    /* ── Table ───────────────────────────────────────────────── */
+    /* Table */
     .results-table { width: 100%; border-collapse: collapse; font-size: 11px; }
     .results-table th {
       padding: 7px 11px; text-align: left; border-bottom: 2px solid var(--border);
@@ -335,7 +335,7 @@
     }
     .pipeline-view { color: #89b4fa; }
 
-    /* ── PLAN view ───────────────────────────────────────────── */
+    /* PLAN view */
     .plan-view {
       padding: 1.1rem 1.25rem; font-size: 12px; line-height: 1.75;
       color: var(--text); overflow-y: auto; max-height: 380px;
@@ -361,7 +361,7 @@
       border-left: 3px solid var(--accent);
     }
 
-    /* ── STEPS view ──────────────────────────────────────────── */
+    /* STEPS view */
     .steps-view {
       padding: 1.1rem 1.25rem; overflow-y: auto; max-height: 380px;
     }
@@ -377,7 +377,7 @@
     }
     .step-text { font-size: 12px; color: var(--text); line-height: 1.7; }
 
-    /* ── DATA view ───────────────────────────────────────────── */
+    /* DATA view */
     .data-view { display: flex; flex-direction: column; overflow-y: auto; max-height: 380px; }
     .data-section { border-bottom: 1px solid var(--border); }
     .data-section:last-child { border-bottom: none; }
@@ -393,7 +393,7 @@
     }
     .data-analysis-body .ai-summary { padding: 0; font-size: 12px; }
 
-    /* ── Input dock (fixed at bottom) ────────────────────────── */
+    /* Input dock (fixed at bottom) */
     .input-dock {
       flex-shrink: 0; padding: .875rem 1.5rem 1.25rem;
       background: var(--bg); border-top: 1px solid var(--border);
@@ -449,7 +449,7 @@
     .input-footer-hint { color: var(--dimmer); font-size: 10px; }
     .listening-hint { color: var(--accent); font-size: 11px; animation: pulse 1s infinite; }
 
-    /* ── Share modal ─────────────────────────────────────────── */
+    /* Share modal */
     .modal-backdrop {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.45); z-index: 200;
@@ -488,7 +488,7 @@
     }
     .modal-close-btn:hover { border-color: var(--border2); color: var(--text); background: var(--bg2); }
 
-    /* ── Mobile responsive ───────────────────────────────────── */
+    /* Mobile responsive */
     @media (max-width: 768px) {
       .hamburger { display: flex; }
       .status { display: none; }
@@ -527,7 +527,7 @@
       .logo-text { display: none; }
     }
 
-    /* ── Assumptions badge ───────────────────────────────────── */
+    /* Assumptions badge */
     .assumptions-badge {
       background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px;
       padding: .55rem .875rem; margin-bottom: .5rem;
@@ -542,7 +542,7 @@
     }
     .assumptions-list li::before { content: "→ "; font-weight: 700; }
 
-    /* ── Validation warning badges (above toggle) ────────────── */
+    /* Validation warning badges (above toggle) */
     .val-warnings-outer { margin-bottom: .5rem; }
     .val-warning-badge {
       display: flex; align-items: flex-start; gap: .5rem;
@@ -553,7 +553,7 @@
     .val-warning-badge.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
     .val-warning-badge-icon { flex-shrink: 0; font-weight: 700; }
 
-    /* ── Feedback bar ────────────────────────────────────────── */
+    /* Feedback bar */
     .feedback-bar {
       display: flex; align-items: center; gap: .5rem;
       padding: .35rem 0 .65rem; flex-wrap: wrap;
@@ -575,7 +575,7 @@
     .feedback-status.ok  { color: var(--green); background: #f0fdf4; }
     .feedback-status.err { color: var(--red);   background: #fef2f2; }
 
-    /* ── Correction form ─────────────────────────────────────── */
+    /* Correction form */
     .correction-form {
       margin-top: .4rem; padding: .75rem; background: var(--bg2);
       border: 1px solid var(--border2); border-radius: 6px;
@@ -605,7 +605,7 @@
     }
     .btn-correction-cancel:hover { background: var(--bg3); }
 
-    /* ── VALIDATION tab view ─────────────────────────────────── */
+    /* VALIDATION tab view */
     .validation-view {
       padding: 1rem 1.25rem; overflow-y: auto; max-height: 420px;
       display: flex; flex-direction: column; gap: 1.1rem;
@@ -621,6 +621,114 @@
     .val-confidence.high   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
     .val-confidence.medium { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
     .val-confidence.low    { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    /* Accuracy badge + breakdown panel */
+    .val-badge-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .val-accuracy {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
+      cursor: pointer; user-select: none; transition: filter .15s;
+    }
+    .val-accuracy:hover { filter: brightness(0.96); }
+    .val-accuracy.high   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+    .val-accuracy.medium { background: #fffbeb; color: #b45309; border: 1px solid #fcd34d; }
+    .val-accuracy.low    { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+    .val-accuracy.unknown{ background: var(--bg2);  color: var(--dim);  border: 1px solid var(--border2); }
+    .val-accuracy-caret  { font-size: 9px; opacity: .75; margin-left: 2px; }
+    .val-accuracy-panel  {
+      margin-top: .6rem; padding: .6rem .8rem;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; font-size: 11px; display: none;
+    }
+    .val-accuracy-panel.open { display: block; }
+    .val-signal-row {
+      display: grid; grid-template-columns: 110px 50px 1fr;
+      gap: 8px; padding: .35rem 0; align-items: baseline;
+      border-bottom: 1px dashed var(--border);
+    }
+    .val-signal-row:last-child { border-bottom: none; }
+    .val-signal-name { font-weight: 700; color: var(--text); text-transform: capitalize; }
+    .val-signal-name.disabled { color: var(--dimmer); font-weight: 500; }
+    .val-signal-score { font-family: var(--mono); color: var(--accent); font-weight: 700; text-align: right; }
+    .val-signal-score.s-low    { color: #991b1b; }
+    .val-signal-score.s-med    { color: #b45309; }
+    .val-signal-score.s-high   { color: #166534; }
+    .val-signal-score.disabled { color: var(--dimmer); }
+    .val-signal-notes { color: var(--dim); line-height: 1.45; font-size: 10.5px; }
+    .val-accuracy-formula {
+      margin-top: .5rem; padding-top: .4rem;
+      border-top: 1px solid var(--border2);
+      font-size: 10px; color: var(--dimmer); font-family: var(--mono);
+    }
+
+    /* Trainer panel */
+    .train-view {
+      padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 1rem;
+      max-height: 640px; overflow-y: auto;
+    }
+    .train-login {
+      max-width: 360px; display: flex; flex-direction: column; gap: .6rem;
+      padding: 1rem; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .train-login input {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border2);
+      border-radius: 5px; padding: 8px 10px; font-family: var(--mono); font-size: 12px;
+    }
+    .train-login input:focus { outline: 1px solid var(--accent); }
+    .train-btn {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 5px; padding: 7px 14px; font-family: var(--mono);
+      font-size: 11px; font-weight: 700; cursor: pointer; transition: filter .15s;
+    }
+    .train-btn:hover:not(:disabled) { filter: brightness(1.08); }
+    .train-btn:disabled { opacity: .5; cursor: default; }
+    .train-btn.ghost {
+      background: none; color: var(--dim); border: 1px solid var(--border2);
+    }
+    .train-btn.ghost:hover:not(:disabled) { background: var(--bg3); filter: none; }
+    .train-btn.danger { background: #991b1b; }
+    .train-status {
+      font-size: 11px; color: var(--dim); font-family: var(--mono); min-height: 14px;
+    }
+    .train-status.err { color: #991b1b; }
+    .train-status.ok  { color: #166534; }
+
+    .train-section-title {
+      font-size: 9px; letter-spacing: .12em; color: var(--accent);
+      font-weight: 700; text-transform: uppercase; margin-bottom: .3rem;
+    }
+    .train-editor {
+      width: 100%; min-height: 160px; resize: vertical;
+      font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+      color: var(--text); background: var(--bg); border: 1px solid var(--border2);
+      border-radius: 5px; padding: .6rem .7rem;
+    }
+    .train-editor:focus { outline: 1px solid var(--accent); }
+    .train-editor.invalid { border-color: #ef4444; }
+    .train-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+    .train-preview {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 6px; padding: .6rem .8rem; font-size: 11px;
+      display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+    }
+    .train-preview .k { color: var(--dim); }
+    .train-preview .v { color: var(--text); font-weight: 700; font-family: var(--mono); }
+    .train-parse-err {
+      font-family: var(--mono); font-size: 11px; color: #991b1b; padding: .3rem 0;
+    }
+    .train-gold-list {
+      margin-top: .4rem; font-size: 11px; max-height: 150px; overflow-y: auto;
+      border-top: 1px dashed var(--border);
+    }
+    .train-gold-item {
+      display: grid; grid-template-columns: 110px 1fr 80px;
+      gap: 8px; padding: .35rem 0; border-bottom: 1px dashed var(--border);
+    }
+    .train-gold-item:last-child { border-bottom: none; }
+    .train-gold-id { font-family: var(--mono); color: var(--accent); }
+    .train-gold-q  { color: var(--text); }
+    .train-gold-rc { text-align: right; color: var(--dim); font-family: var(--mono); }
     .val-check-row {
       display: flex; align-items: flex-start; gap: .5rem;
       padding: .4rem .6rem; border-radius: 5px; font-size: 11px;
@@ -646,7 +754,7 @@
       .btn-feedback { padding: 6px 12px; }
     }
 
-    /* ── Ask Again button ────────────────────────────────────── */
+    /* Ask Again button */
     .btn-ask-again {
       display: inline-flex; align-items: center; gap: 6px;
       background: none; border: 1px solid var(--border2); color: var(--dim);
@@ -666,7 +774,7 @@
 <body>
 <div id="app">
 
-  <!-- ── HEADER ─────────────────────────────────────────────── -->
+  <!-- HEADER -->
   <header>
     <div class="logo">
       <div class="logo-dot"></div>
@@ -692,13 +800,13 @@
     </div>
   </header>
 
-  <!-- ── WORKSPACE ──────────────────────────────────────────── -->
+  <!-- WORKSPACE -->
   <div class="workspace">
 
     <!-- Sidebar overlay (mobile tap-to-close) -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-    <!-- ── SIDEBAR ────────────────────────────────────────────── -->
+    <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-top">
         <button class="new-chat-btn" id="newChatBtn">
@@ -713,7 +821,7 @@
       </div>
     </aside>
 
-    <!-- ── CHAT AREA ──────────────────────────────────────────── -->
+    <!-- CHAT AREA -->
     <div class="chat-area">
 
       <!-- Share banner (shown when viewing a shared chat) -->
@@ -768,7 +876,7 @@
 
   </div><!-- end .workspace -->
 
-  <!-- ── SHARE MODAL ────────────────────────────────────────── -->
+  <!-- SHARE MODAL -->
   <div class="modal-backdrop" id="shareModal">
     <div class="modal">
       <div class="modal-title">Share this chat</div>
@@ -785,9 +893,7 @@
 </div><!-- end #app -->
 
 <script>
-// ============================================================
 // Eagle 3DS Query UI — v5
-// ============================================================
 
 const PAGE_SIZE = 25;
 
@@ -815,7 +921,7 @@ let recognition   = null;
 const msgState = new WeakMap();
 
 
-// ── DOM refs ──────────────────────────────────────────────────
+// DOM refs
 const questionInput   = document.getElementById("questionInput");
 const runBtn          = document.getElementById("runBtn");
 const stopBtn         = document.getElementById("stopBtn");
@@ -844,7 +950,7 @@ const sidebar         = document.getElementById("sidebar");
 const sidebarOverlay  = document.getElementById("sidebarOverlay");
 
 
-// ── localStorage helpers ──────────────────────────────────────
+// localStorage helpers
 function getChats() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); }
   catch { return []; }
@@ -866,7 +972,7 @@ function deleteChat(id) {
 }
 
 
-// ── Mobile sidebar ────────────────────────────────────────────
+// Mobile sidebar
 function openSidebar() {
   sidebar.classList.add("open");
   sidebarOverlay.classList.add("open");
@@ -881,7 +987,7 @@ hamburger.addEventListener("click", () => {
 sidebarOverlay.addEventListener("click", closeSidebar);
 
 
-// ── LLM status badge ──────────────────────────────────────────
+// LLM status badge
 async function refreshLLMStatus() {
   try {
     const r    = await fetch("/api/status");
@@ -908,14 +1014,42 @@ refreshLLMStatus();
 setInterval(refreshLLMStatus, 30_000);
 
 
-// ── Auto-resize textarea ──────────────────────────────────────
+// Trainer state
+const Trainer = {
+  enabled: false,
+  token:   sessionStorage.getItem("trainer_token") || "",
+  setToken(t) {
+    this.token = t || "";
+    if (t) sessionStorage.setItem("trainer_token", t);
+    else   sessionStorage.removeItem("trainer_token");
+  },
+  isAuthed() { return !!this.token; },
+  authHeader() { return this.token ? { "Authorization": "Bearer " + this.token } : {}; },
+};
+
+async function refreshTrainerStatus() {
+  try {
+    const r = await fetch("/api/train/status");
+    const j = await r.json();
+    Trainer.enabled = !!j.enabled;
+  } catch { Trainer.enabled = false; }
+  document.querySelectorAll(".train-tab").forEach(btn => {
+    btn.style.display = Trainer.enabled ? "" : "none";
+    const lock = btn.querySelector(".train-lock");
+    if (lock) lock.textContent = Trainer.isAuthed() ? "🔓" : "🔒";
+  });
+}
+refreshTrainerStatus();
+
+
+// Auto-resize textarea
 questionInput.addEventListener("input", () => {
   questionInput.style.height = "auto";
   questionInput.style.height = Math.min(questionInput.scrollHeight, 180) + "px";
 });
 
 
-// ── Keyboard / button handlers ────────────────────────────────
+// Keyboard / button handlers
 questionInput.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitQuery(); }
 });
@@ -924,7 +1058,7 @@ stopBtn.addEventListener("click", () => { if (activeAbort) activeAbort.abort(); 
 newChatBtn.addEventListener("click", startNewChat);
 
 
-// ── Example chips ─────────────────────────────────────────────
+// Example chips
 document.querySelectorAll(".example-chip").forEach(btn => {
   btn.addEventListener("click", () => {
     questionInput.value = btn.textContent;
@@ -934,7 +1068,7 @@ document.querySelectorAll(".example-chip").forEach(btn => {
 });
 
 
-// ── Start a new chat session ──────────────────────────────────
+// Start a new chat session
 function startNewChat() {
   SESSION_ID   = randomUUID();
   currentTurns = [];
@@ -950,7 +1084,7 @@ function startNewChat() {
 }
 
 
-// ── Submit a query ────────────────────────────────────────────
+// Submit a query
 async function submitQuery() {
   const q = questionInput.value.trim();
   if (!q || runBtn.disabled) return;
@@ -1027,7 +1161,7 @@ async function submitQuery() {
 }
 
 
-// ── Persist session to localStorage ──────────────────────────
+// Persist session to localStorage
 function persistCurrentSession(firstQuestion) {
   const chat = getChat(SESSION_ID) || {
     id:        SESSION_ID,
@@ -1041,7 +1175,7 @@ function persistCurrentSession(firstQuestion) {
 }
 
 
-// ── Trim data for localStorage ────────────────────────────────
+// Trim data for localStorage
 function trimDataForStorage(data) {
   if (!data) return data;
   const trimmed = { ...data };
@@ -1056,7 +1190,7 @@ function trimDataForStorage(data) {
 }
 
 
-// ── Message builders ──────────────────────────────────────────
+// Message builders
 function appendUserMessage(question) {
   const wrap = document.createElement("div");
   wrap.className = "msg msg-user";
@@ -1129,7 +1263,7 @@ function replaceLoadingWithError(loadingEl, msg, originalQuestion) {
 }
 
 
-// ── Simple markdown → HTML renderer ──────────────────────────
+// Simple markdown → HTML renderer
 function renderMd(text) {
   if (!text) return "";
   const lines  = text.split("\n");
@@ -1183,7 +1317,7 @@ function renderMd(text) {
 }
 
 
-// ── Build a result message card ───────────────────────────────
+// Build a result message card
 function buildResultCard(data) {
   const wrapper = document.createElement("div");
 
@@ -1282,6 +1416,7 @@ function buildResultCard(data) {
     </div>
     <div class="result-card-header-right">
       <div class="view-tabs">
+        <button class="tab-btn"        data-view="query">QUERY</button>
         <button class="tab-btn active" data-view="table">TABLE</button>
         <button class="tab-btn"        data-view="json">JSON</button>
         <button class="tab-btn"        data-view="pipeline">PIPELINE</button>
@@ -1289,6 +1424,7 @@ function buildResultCard(data) {
         <button class="tab-btn"        data-view="dataview">DATA</button>
         <button class="tab-btn"        data-view="steps">STEPS</button>
         <button class="tab-btn"        data-view="validation">VALIDATION</button>
+        <button class="tab-btn train-tab" data-view="train" style="display:none">TRAINER <span class="train-lock">🔒</span></button>
       </div>
     </div>
   `;
@@ -1297,7 +1433,7 @@ function buildResultCard(data) {
   const copyBar = document.createElement("div");
   copyBar.className = "copy-bar";
   copyBar.style.display = "none";
-  copyBar.innerHTML = `<button class="btn-copy">COPY PIPELINE</button>`;
+  copyBar.innerHTML = `<button class="btn-copy">COPY</button>`;
   card.appendChild(copyBar);
 
   const resultBody = document.createElement("div");
@@ -1331,6 +1467,9 @@ function buildResultCard(data) {
     });
   });
 
+  // Reveal TRAIN tab if trainer mode is enabled on the server
+  refreshTrainerStatus();
+
   // Pagination
   pageBar.querySelector(".prev-btn").addEventListener("click", () => {
     if (state.page > 1) { state.page--; renderCardBody(card); }
@@ -1340,20 +1479,72 @@ function buildResultCard(data) {
     if (state.page < total) { state.page++; renderCardBody(card); }
   });
 
-  // Copy pipeline
+  // Same button, two labels. renderCardBody sets btn.dataset.mode to
+  // "query" or "pipeline" before showing the bar.
   copyBar.querySelector(".btn-copy").addEventListener("click", () => {
-    const btn  = copyBar.querySelector(".btn-copy");
-    const pipe = data.executedPipeline || [];
-    navigator.clipboard.writeText(JSON.stringify(pipe, null, 2))
-      .then(() => { btn.textContent = "COPIED ✓"; setTimeout(() => btn.textContent = "COPY PIPELINE", 2000); })
-      .catch(() => { btn.textContent = "FAILED";  setTimeout(() => btn.textContent = "COPY PIPELINE", 2000); });
+    const btn      = copyBar.querySelector(".btn-copy");
+    const mode     = btn.dataset.mode || "pipeline";
+    const original = mode === "query" ? "COPY MONGOSHELL" : "COPY PIPELINE";
+    const payload  = mode === "query"
+      ? buildMongoShellCommand(data)
+      : JSON.stringify(data.executedPipeline || [], null, 2);
+    navigator.clipboard.writeText(payload)
+      .then(() => { btn.textContent = "COPIED ✓"; setTimeout(() => btn.textContent = original, 2000); })
+      .catch(() => { btn.textContent = "FAILED";  setTimeout(() => btn.textContent = original, 2000); });
   });
 
   return wrapper;
 }
 
 
-// ── Render the body of a result card ─────────────────────────
+// Rebuild what you'd paste into mongosh from the query the LLM produced.
+// Kept in JS (not returned by the server) so the QUERY tab renders instantly
+// on tab-switch without an extra round trip.
+function buildMongoShellCommand(data) {
+  const meta = data.queryMeta || {};
+  const qt   = data.queryType || meta.queryType || "single";
+  const j    = (v) => JSON.stringify(v ?? {}, null, 2);
+
+  const renderSingle = (db, coll, op, spec) => {
+    const header = `use ${db || "<database>"}\n`;
+    const c      = coll || "<collection>";
+    if (op === "countDocuments") {
+      return `${header}\ndb.${c}.countDocuments(${j(spec.query)})`;
+    }
+    if (op === "distinct") {
+      return `${header}\ndb.${c}.distinct(${JSON.stringify(spec.field || "")}, ${j(spec.query)})`;
+    }
+    if (op === "find") {
+      const parts = [`db.${c}.find(${j(spec.query)}${spec.projection ? ", " + j(spec.projection) : ""})`];
+      if (spec.sort)  parts.push(`.sort(${j(spec.sort)})`);
+      if (spec.limit) parts.push(`.limit(${Number(spec.limit) || 50})`);
+      return `${header}\n${parts.join("")}`;
+    }
+    // default: aggregate
+    const pipe = spec.pipeline || data.executedPipeline || [];
+    return `${header}\ndb.${c}.aggregate(${j(pipe)})`;
+  };
+
+  if (qt === "dual") {
+    const qs = data.queries || meta.queries || [];
+    if (!qs.length) return "// dual query — no queries[] returned";
+    return qs.map((q, i) => {
+      const block = renderSingle(
+        q.database, q.collection, q.operation || "aggregate", q,
+      );
+      return `// Query ${i + 1}\n${block}`;
+    }).join("\n\n");
+  }
+
+  return renderSingle(
+    meta.database,
+    meta.collection,
+    meta.operation || "aggregate",
+    { ...meta, pipeline: meta.pipeline || data.executedPipeline },
+  );
+}
+
+
 function renderCardBody(card) {
   const state   = msgState.get(card);
   const copyBar = card.querySelector(".copy-bar");
@@ -1361,10 +1552,27 @@ function renderCardBody(card) {
   const body    = card.querySelector(".result-body");
   const data    = state.data;
 
-  copyBar.style.display = state.view === "pipeline" ? "flex" : "none";
+  const copyBtn = copyBar.querySelector(".btn-copy");
+  if (state.view === "query") {
+    copyBar.style.display = "flex";
+    copyBtn.dataset.mode  = "query";
+    copyBtn.textContent   = "COPY MONGOSHELL";
+  } else if (state.view === "pipeline") {
+    copyBar.style.display = "flex";
+    copyBtn.dataset.mode  = "pipeline";
+    copyBtn.textContent   = "COPY PIPELINE";
+  } else {
+    copyBar.style.display = "none";
+  }
   body.innerHTML = "";
 
-  if (state.view === "table") {
+  if (state.view === "query") {
+    pageBar.style.display = "none";
+    const pre = document.createElement("pre");
+    pre.className = "code-view pipeline-view";
+    pre.textContent = buildMongoShellCommand(data);
+    body.appendChild(pre);
+  } else if (state.view === "table") {
     renderTableInBody(body, pageBar, state);
   } else if (state.view === "json") {
     pageBar.style.display = "none";
@@ -1391,6 +1599,9 @@ function renderCardBody(card) {
   } else if (state.view === "validation") {
     pageBar.style.display = "none";
     renderValidationView(body, state);
+  } else if (state.view === "train") {
+    pageBar.style.display = "none";
+    renderTrainView(body, state);
   }
 }
 
@@ -1420,7 +1631,7 @@ function renderTableInBody(body, pageBar, state) {
 }
 
 
-// ── PLAN view ─────────────────────────────────────────────────
+// PLAN view
 function renderPlanView(body, data) {
   const plan = data.queryPlan;
   const explanation = data.explanation || "";
@@ -1480,7 +1691,7 @@ function renderPlanView(body, data) {
 }
 
 
-// ── DATA view — raw DB results + AI analysis ──────────────────
+// DATA view — raw DB results + AI analysis
 function renderDataView(body, data, state) {
   const wrapper = document.createElement("div");
   wrapper.className = "data-view";
@@ -1537,7 +1748,7 @@ function renderDataView(body, data, state) {
 }
 
 
-// ── STEPS view — human-written execution plan ─────────────────
+// STEPS view — human-written execution plan
 function buildExecutionSteps(data) {
   const steps = [];
   const plan  = data.queryPlan;
@@ -1606,7 +1817,7 @@ function renderStepsView(body, data) {
 }
 
 
-// ── Sidebar rendering ─────────────────────────────────────────
+// Sidebar rendering
 function renderSidebar() {
   const chats = getChats();
   sidebarSessions.innerHTML = "";
@@ -1686,7 +1897,7 @@ function dateGroupLabel(iso) {
 }
 
 
-// ── Load a stored session ─────────────────────────────────────
+// Load a stored session
 function loadSession(chatId) {
   const chat = getChat(chatId);
   if (!chat) return;
@@ -1759,13 +1970,13 @@ function loadSession(chatId) {
 }
 
 
-// ── Share button visibility ───────────────────────────────────
+// Share button visibility
 function updateShareBtnVisibility() {
   shareBtn.style.display = currentTurns.length > 0 ? "" : "none";
 }
 
 
-// ── Share modal ───────────────────────────────────────────────
+// Share modal
 shareBtn.addEventListener("click", openShareModal);
 shareCloseBtn.addEventListener("click", closeShareModal);
 shareModal.addEventListener("click", e => { if (e.target === shareModal) closeShareModal(); });
@@ -1825,13 +2036,13 @@ function closeShareModal() {
 }
 
 
-// ── Share banner ──────────────────────────────────────────────
+// Share banner
 shareBannerClose.addEventListener("click", () => {
   shareBanner.style.display = "none";
 });
 
 
-// ── Shared chat URL detection on load ─────────────────────────
+// Shared chat URL detection on load
 async function checkSharedChatUrl() {
   const match = location.pathname.match(/^\/share\/([a-f0-9]{16})$/);
   if (!match) return;
@@ -1890,13 +2101,13 @@ async function checkSharedChatUrl() {
 checkSharedChatUrl();
 
 
-// ── Scroll to bottom ──────────────────────────────────────────
+// Scroll to bottom
 function scrollToBottom() {
   requestAnimationFrame(() => { messagesWrap.scrollTop = messagesWrap.scrollHeight; });
 }
 
 
-// ── Loading state ─────────────────────────────────────────────
+// Loading state
 function setLoading(on) {
   runBtn.disabled         = on;
   voiceBtn.disabled       = on;
@@ -1906,7 +2117,7 @@ function setLoading(on) {
 }
 
 
-// ── Table builder ─────────────────────────────────────────────
+// Table builder
 const PRIORITY = [
   "_id","appInfo.owner","appInfo.appName","clientInfo.city",
   "clientInfo.country_name","loadTime","webRtcStatsData.avgBitrate",
@@ -1958,7 +2169,7 @@ function renderCell(v) {
 }
 
 
-// ── Utilities ─────────────────────────────────────────────────
+// Utilities
 function escHtml(s) {
   return String(s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -1975,7 +2186,7 @@ function fmtTime(iso) {
 }
 
 
-// ── Voice input ───────────────────────────────────────────────
+// Voice input
 const VOICE_SECURE = window.isSecureContext;
 const VOICE_HAS_SR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 const VOICE_HAS_MR = !!(navigator.mediaDevices && window.MediaRecorder);
@@ -2092,7 +2303,395 @@ function stopVoiceUI() {
 }
 
 
-// ── VALIDATION tab view ───────────────────────────────────────
+// Trainer panel
+function renderTrainView(body, state) {
+  const view = document.createElement("div");
+  view.className = "train-view";
+
+  if (!Trainer.enabled) {
+    view.innerHTML = `<div class="val-empty">
+      Trainer mode is disabled. Set <code>TRAINER_PASSWORD</code> in <code>.env</code> and restart.
+    </div>`;
+    body.appendChild(view);
+    return;
+  }
+
+  if (!Trainer.isAuthed()) {
+    renderTrainLogin(view, state, body);
+  } else {
+    renderTrainEditor(view, state, body);
+  }
+  body.appendChild(view);
+}
+
+
+function renderTrainLogin(view, state, body) {
+  const box = document.createElement("div");
+  box.className = "train-login";
+  box.innerHTML = `
+    <div class="train-section-title">Trainer Authentication</div>
+    <input type="password" class="train-pw" placeholder="TRAINER_PASSWORD" autocomplete="current-password">
+    <div class="train-row">
+      <button class="train-btn do-login">Unlock</button>
+      <span class="train-status"></span>
+    </div>`;
+  view.appendChild(box);
+
+  const pw     = box.querySelector(".train-pw");
+  const btn    = box.querySelector(".do-login");
+  const status = box.querySelector(".train-status");
+
+  async function doLogin() {
+    const p = (pw.value || "").trim();
+    if (!p) return;
+    btn.disabled = true; status.className = "train-status"; status.textContent = "Signing in…";
+    try {
+      const r = await fetch("/api/train/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: p }),
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || "login failed");
+      Trainer.setToken(j.token);
+      refreshTrainerStatus();
+      body.innerHTML = "";
+      renderTrainView(body, state);
+    } catch (e) {
+      status.className = "train-status err";
+      status.textContent = e.message || "Login failed.";
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener("click", doLogin);
+  pw.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+  setTimeout(() => pw.focus(), 50);
+}
+
+
+function renderTrainEditor(view, state, body) {
+  const data      = state.data;
+  const question  = data?.meta?.question || "";
+  const origQuery = data?.queryMeta || {};
+
+  // Extract the pipeline the user is editing (for dual, show primary first).
+  let basePipeline;
+  if (origQuery.queryType === "dual") {
+    const q0 = (origQuery.queries || [])[0] || {};
+    basePipeline = q0.pipeline || [];
+  } else {
+    basePipeline = origQuery.pipeline || [];
+  }
+  const collection = origQuery.collection || "";
+
+  // Header strip + how-it-works hint
+  const head = document.createElement("div");
+  head.innerHTML = `
+    <div class="train-section-title">Trainer: lock this question as a gold standard</div>
+    <div class="val-empty" style="margin:.3rem 0 .5rem 0;line-height:1.5">
+      Edit the pipeline below to be exactly right, click <b>Run Corrected</b> to verify it returns rows,
+      then <b>Save as Gold</b>. The saved entry is written to <code>eval_set.json</code> (locked), the
+      RAG store at <b>weight 3.0</b> (steers future answers), and an audit row in MongoDB.
+    </div>
+    <div class="train-preview">
+      <span><span class="k">Question:</span> <span class="v">${escHtml(question)}</span></span>
+      <span><span class="k">Collection:</span> <span class="v">${escHtml(collection || "—")}</span></span>
+      <span><span class="k">Type:</span> <span class="v">${escHtml(origQuery.queryType || "—")}</span></span>
+    </div>`;
+  view.appendChild(head);
+
+  // Editor (textarea)
+  const editor = document.createElement("div");
+  editor.innerHTML = `
+    <div class="train-section-title" style="margin-top:.7rem">Corrected pipeline JSON (edit-me)</div>
+    <textarea class="train-editor" spellcheck="false"></textarea>
+    <div class="train-parse-err" style="display:none"></div>
+    <div class="train-row" style="margin-top:.5rem">
+      <button class="train-btn run">Run Corrected</button>
+      <button class="train-btn ghost reset">Reset</button>
+      <button class="train-btn ghost logout">Logout</button>
+      <span class="train-status run-status"></span>
+    </div>`;
+  view.appendChild(editor);
+
+  const ta       = editor.querySelector(".train-editor");
+  const parseErr = editor.querySelector(".train-parse-err");
+  const runBtn   = editor.querySelector(".run");
+  const resetBtn = editor.querySelector(".reset");
+  const logoutBtn= editor.querySelector(".logout");
+  const runStat  = editor.querySelector(".run-status");
+
+  const initial  = JSON.stringify(basePipeline, null, 2);
+  ta.value       = state.trainDraft || initial;
+
+  // Result/score preview (populated after Run)
+  const preview = document.createElement("div");
+  preview.className = "train-preview";
+  preview.style.display = "none";
+  view.appendChild(preview);
+
+  // Tags input (sent with Save as Gold)
+  const tagsRow = document.createElement("div");
+  tagsRow.className = "train-row";
+  tagsRow.style.display = "none";
+  tagsRow.style.marginTop = ".5rem";
+  tagsRow.innerHTML = `
+    <span class="k" style="font-size:11px;color:var(--dim)">Tags (comma-separated):</span>
+    <input type="text" class="train-tags" placeholder="e.g. monthly, top-N, vpn, owner-grouping"
+           style="flex:1;min-width:200px;padding:4px 8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);border-radius:4px;font-family:var(--mono);font-size:11px">`;
+  view.appendChild(tagsRow);
+
+  // Save bar (populated after a successful Run)
+  const saveBar = document.createElement("div");
+  saveBar.className = "train-row";
+  saveBar.style.display = "none";
+  saveBar.innerHTML = `
+    <button class="train-btn save">Save as Gold</button>
+    <button class="train-btn ghost discard">Discard</button>
+    <span class="train-status save-status"></span>`;
+  view.appendChild(saveBar);
+
+  // Recent-gold list
+  const listWrap = document.createElement("div");
+  listWrap.innerHTML = `
+    <div class="train-section-title" style="margin-top:.8rem">Recent trainer-gold cases</div>
+    <div class="train-gold-list"><div class="val-empty">loading…</div></div>`;
+  view.appendChild(listWrap);
+  const listEl = listWrap.querySelector(".train-gold-list");
+
+  let lastRun = null;
+
+  function parsePipelineOrWarn() {
+    try {
+      const p = JSON.parse(ta.value);
+      if (!Array.isArray(p)) throw new Error("must be a JSON array of stages");
+      ta.classList.remove("invalid");
+      parseErr.style.display = "none";
+      return p;
+    } catch (e) {
+      ta.classList.add("invalid");
+      parseErr.style.display = "block";
+      parseErr.textContent = "✗ " + (e.message || "invalid JSON");
+      return null;
+    }
+  }
+
+  ta.addEventListener("input", () => {
+    state.trainDraft = ta.value;
+    parsePipelineOrWarn();
+  });
+
+  resetBtn.addEventListener("click", () => {
+    ta.value = initial;
+    state.trainDraft = initial;
+    parsePipelineOrWarn();
+  });
+
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      await fetch("/api/train/logout", { method: "POST", headers: Trainer.authHeader() });
+    } catch {}
+    Trainer.setToken("");
+    refreshTrainerStatus();
+    body.innerHTML = "";
+    renderTrainView(body, state);
+  });
+
+  runBtn.addEventListener("click", async () => {
+    const p = parsePipelineOrWarn();
+    if (!p) return;
+    runBtn.disabled = true;
+    runStat.className = "train-status";
+    runStat.textContent = "Running…";
+    preview.style.display = "none";
+    saveBar.style.display = "none";
+
+    try {
+      const r = await fetch("/api/train/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...Trainer.authHeader() },
+        body: JSON.stringify({
+          session_id:         SESSION_ID,
+          question:           question,
+          original_query:     origQuery,
+          corrected_pipeline: p,
+          collection:         collection,
+        }),
+      });
+      const j = await r.json();
+      if (r.status === 401) {
+        Trainer.setToken("");
+        refreshTrainerStatus();
+        body.innerHTML = "";
+        renderTrainView(body, state);
+        return;
+      }
+      if (!j.success) throw new Error(j.error || "run failed");
+
+      const d = j.data;
+      lastRun = d;
+      const acc = d.accuracy || {};
+      const score = acc.score == null ? "—" : `${Math.round(acc.score)}/100`;
+      const tier  = acc.tier || "—";
+
+      preview.innerHTML = `
+        <span><span class="k">Rows:</span> <span class="v">${d.resultCount}</span></span>
+        <span><span class="k">Accuracy:</span> <span class="v">${score} · ${tier.toUpperCase()}</span></span>
+        <span><span class="k">Checks:</span> <span class="v">${(d.validationWarnings || []).length}</span></span>`;
+      preview.style.display = "flex";
+
+      if (d.resultCount > 0) {
+        saveBar.style.display = "flex";
+        tagsRow.style.display = "flex";
+        runStat.className = "train-status ok";
+        runStat.textContent = `✓ Ran successfully — review then Save as Gold`;
+      } else {
+        runStat.className = "train-status err";
+        runStat.textContent = "Ran but returned 0 rows. Gold save is blocked.";
+      }
+    } catch (e) {
+      runStat.className = "train-status err";
+      runStat.textContent = "✗ " + (e.message || "run failed");
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
+
+  saveBar.querySelector(".discard").addEventListener("click", () => {
+    saveBar.style.display = "none";
+    tagsRow.style.display = "none";
+    preview.style.display = "none";
+    lastRun = null;
+    runStat.textContent = "";
+  });
+
+  saveBar.querySelector(".save").addEventListener("click", async () => {
+    if (!lastRun || lastRun.resultCount <= 0) return;
+    const p = parsePipelineOrWarn();
+    if (!p) return;
+
+    const saveBtn  = saveBar.querySelector(".save");
+    const saveStat = saveBar.querySelector(".save-status");
+    saveBtn.disabled = true;
+    saveStat.className = "train-status"; saveStat.textContent = "Saving…";
+
+    const tagsText = (tagsRow.querySelector(".train-tags")?.value || "").trim();
+    const evalTags = tagsText ? tagsText.split(",").map(t => t.trim()).filter(Boolean) : [];
+    try {
+      const r = await fetch("/api/train/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...Trainer.authHeader() },
+        body: JSON.stringify({
+          session_id:         SESSION_ID,
+          question:           question,
+          original_query:     origQuery,
+          corrected_pipeline: p,
+          collection:         collection,
+          result_count:       lastRun.resultCount,
+          eval_tags:          evalTags,
+        }),
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || "save failed");
+
+      saveStat.className = "train-status ok";
+      saveStat.textContent = `✓ Saved as ${j.data.eval_id} (rag=${(j.data.rag_id || "").slice(0, 8)}…)`;
+      await loadGoldList();
+    } catch (e) {
+      saveStat.className = "train-status err";
+      saveStat.textContent = "✗ " + (e.message || "save failed");
+      saveBtn.disabled = false;
+    }
+  });
+
+  async function loadGoldList() {
+    try {
+      const r = await fetch("/api/train/list", { headers: Trainer.authHeader() });
+      const j = await r.json();
+      if (!j.success) {
+        listEl.innerHTML = `<div class="val-empty">${escHtml(j.error || "load failed")}</div>`;
+        return;
+      }
+      const items = j.data.recent || [];
+      if (!items.length) {
+        listEl.innerHTML = `<div class="val-empty">No gold cases yet — yours will be the first.</div>`;
+        return;
+      }
+      listEl.innerHTML = items.map(it => {
+        const ts = it.saved_at ? new Date(it.saved_at).toLocaleString() : "—";
+        const tags = (it.tags || []).map(t => `<span style="background:var(--bg3);color:var(--dim);padding:1px 5px;border-radius:3px;font-size:10px;margin-right:3px">${escHtml(t)}</span>`).join("");
+        return `
+          <div class="train-gold-item">
+            <div class="train-gold-id">${escHtml(it.id || "")}</div>
+            <div class="train-gold-q">${escHtml(it.question || "")}<div style="margin-top:2px">${tags}<span style="font-size:10px;color:var(--dim)">${escHtml(ts)}</span></div></div>
+            <div class="train-gold-rc">${it.result_count ?? "—"} rows</div>
+          </div>`;
+      }).join("");
+    } catch (e) {
+      listEl.innerHTML = `<div class="val-empty">Could not load list: ${escHtml(e.message || "")}</div>`;
+    }
+  }
+  loadGoldList();
+
+  parsePipelineOrWarn();
+}
+
+
+// Accuracy badge + expandable breakdown
+function renderAccuracyBadge(badgeRow, section, accuracy) {
+  if (!accuracy || accuracy.score === null || accuracy.score === undefined) {
+    const span = document.createElement("span");
+    span.className = "val-accuracy unknown";
+    span.textContent = "Accuracy: —";
+    badgeRow.appendChild(span);
+    return;
+  }
+
+  const tier  = accuracy.tier  || "medium";
+  const score = Math.round(accuracy.score);
+
+  const badge = document.createElement("span");
+  badge.className = `val-accuracy ${tier}`;
+  badge.innerHTML = `Accuracy ${score}/100 · ${tier.toUpperCase()}<span class="val-accuracy-caret">▾</span>`;
+  badgeRow.appendChild(badge);
+
+  const panel = document.createElement("div");
+  panel.className = "val-accuracy-panel";
+  const signals = accuracy.signals || {};
+
+  const order = ["syntax", "schema", "relationship", "validator", "execution", "llm_critique"];
+  let rows = "";
+  let enabledWeightSum = 0;
+  for (const name of order) {
+    const sig = signals[name];
+    if (!sig) continue;
+    const s = Math.round(sig.score ?? 0);
+    const disabled = sig.enabled === false;
+    if (!disabled) enabledWeightSum += (sig.weight || 0);
+    const cls = disabled ? "disabled" : (s >= 80 ? "s-high" : s >= 50 ? "s-med" : "s-low");
+    const notes = Array.isArray(sig.notes) ? sig.notes.join(" · ") : (sig.notes || "");
+    const wLabel = (sig.weight !== undefined) ? ` <span style="color:var(--dimmer);font-weight:500">(w=${sig.weight})</span>` : "";
+    rows += `
+      <div class="val-signal-row">
+        <div class="val-signal-name ${disabled ? "disabled" : ""}">${escHtml(name.replace("_", " "))}${wLabel}</div>
+        <div class="val-signal-score ${cls}">${disabled ? "off" : s}</div>
+        <div class="val-signal-notes">${escHtml(notes || "—")}</div>
+      </div>`;
+  }
+  panel.innerHTML = rows
+    + `<div class="val-accuracy-formula">weighted avg over enabled signals (Σw=${enabledWeightSum}) → ${score}/100</div>`;
+  section.appendChild(panel);
+
+  badge.addEventListener("click", () => {
+    panel.classList.toggle("open");
+    const caret = badge.querySelector(".val-accuracy-caret");
+    if (caret) caret.textContent = panel.classList.contains("open") ? "▴" : "▾";
+  });
+}
+
+
+// VALIDATION tab view
 function renderValidationView(body, state) {
   const data        = state.data;
   const confidence  = data.confidence  || "medium";
@@ -2107,7 +2706,7 @@ function renderValidationView(body, state) {
   const view = document.createElement("div");
   view.className = "validation-view";
 
-  // ── Confidence ──────────────────────────────────────────────
+  // Confidence + Accuracy
   const confLabels = {
     high:   "HIGH — confident this query is correct",
     medium: "MEDIUM — minor assumptions were made",
@@ -2116,14 +2715,17 @@ function renderValidationView(body, state) {
   const confIcons = { high: "●", medium: "◐", low: "○" };
   const confSec = document.createElement("div");
   confSec.innerHTML = `
-    <div class="val-section-title">AI Confidence</div>
-    <span class="val-confidence ${confidence}">
-      <span>${confIcons[confidence] || "◐"}</span>
-      ${escHtml(confLabels[confidence] || confidence.toUpperCase())}
-    </span>`;
+    <div class="val-section-title">AI Confidence &amp; Accuracy</div>
+    <div class="val-badge-row">
+      <span class="val-confidence ${confidence}">
+        <span>${confIcons[confidence] || "◐"}</span>
+        ${escHtml(confLabels[confidence] || confidence.toUpperCase())}
+      </span>
+    </div>`;
   view.appendChild(confSec);
+  renderAccuracyBadge(confSec.querySelector(".val-badge-row"), confSec, data.accuracy);
 
-  // ── Assumptions ─────────────────────────────────────────────
+  // Assumptions
   const assumpSec = document.createElement("div");
   let assumpHtml = `<div class="val-section-title">Assumptions Made (${assumptions.length})</div>`;
   if (assumptions.length > 0) {
@@ -2139,7 +2741,7 @@ function renderValidationView(body, state) {
   assumpSec.innerHTML = assumpHtml;
   view.appendChild(assumpSec);
 
-  // ── Automated checks ────────────────────────────────────────
+  // Automated checks
   const checkSec = document.createElement("div");
   const icons    = { pass: "✓", warning: "⚠", error: "✗", info: "ℹ" };
   let checkHtml  = `<div class="val-section-title">Automated Checks (${warnings.length})</div>`;
@@ -2156,14 +2758,14 @@ function renderValidationView(body, state) {
   checkSec.innerHTML = checkHtml;
   view.appendChild(checkSec);
 
-  // ── Feedback / rating ────────────────────────────────────────
+  // Feedback / rating
   view.appendChild(buildFeedbackSection(state, question, queryMeta, resultCount));
 
   body.appendChild(view);
 }
 
 
-// ── Feedback section (inside VALIDATION tab) ──────────────────
+// Feedback section (inside VALIDATION tab)
 function buildFeedbackSection(state, question, queryMeta, resultCount) {
   const section = document.createElement("div");
   section.innerHTML = `<div class="val-section-title">Rate This Response</div>`;
@@ -2196,8 +2798,11 @@ function buildFeedbackSection(state, question, queryMeta, resultCount) {
   form.innerHTML = `
     <div class="correction-form-label">What was wrong? (optional)</div>
     <textarea class="correction-note" placeholder="Describe what the AI got wrong or what you expected…" rows="2"></textarea>
-    <div class="correction-form-label">Corrected pipeline JSON (optional)</div>
-    <textarea class="correction-pipeline" placeholder='[{"$match": {...}}, {"$group": {...}}]' rows="3" spellcheck="false"></textarea>
+    <div class="correction-form-label">
+      Edit the pipeline to fix the answer (recommended — teaches the system the correction)
+      <button type="button" class="btn-correction-reset" style="margin-left:.5rem;font-size:10px;padding:1px 6px;border:1px solid var(--border2);background:var(--bg2);color:var(--dim);border-radius:3px;cursor:pointer">↺ reset</button>
+    </div>
+    <textarea class="correction-pipeline" placeholder='[{"$match": {...}}, {"$group": {...}}]' rows="8" spellcheck="false" style="font-family:monospace;font-size:11px"></textarea>
     <div class="correction-form-actions">
       <button class="btn-correction-cancel">Cancel</button>
       <button class="btn-correction-submit">Submit Correction</button>
@@ -2207,6 +2812,21 @@ function buildFeedbackSection(state, question, queryMeta, resultCount) {
   const goodBtn   = bar.querySelector(".btn-feedback.good");
   const badBtn    = bar.querySelector(".btn-feedback.bad");
   const statusEl  = bar.querySelector(".feedback-status");
+
+  // Extract the current pipeline so the 👎 dialog can pre-fill it as a starting
+  // point for the user's correction. Falls back to "" for operations without a
+  // pipeline (e.g. countDocuments with just a filter).
+  function extractCurrentPipeline(meta) {
+    if (!meta) return "";
+    if (meta.queryType === "single" && Array.isArray(meta.pipeline)) {
+      return JSON.stringify(meta.pipeline, null, 2);
+    }
+    if (meta.queryType === "dual" && Array.isArray(meta.queries) && meta.queries[0]?.pipeline) {
+      return JSON.stringify(meta.queries[0].pipeline, null, 2);
+    }
+    return "";
+  }
+  const originalPipelineText = extractCurrentPipeline(queryMeta);
 
   function lockAndShow(rating, message, isOk) {
     goodBtn.disabled = true;
@@ -2240,7 +2860,13 @@ function buildFeedbackSection(state, question, queryMeta, resultCount) {
     goodBtn.classList.remove("selected-good");
     statusEl.style.display = "none";
     form.style.display = "flex";
+    const pipeBox = form.querySelector(".correction-pipeline");
+    if (!pipeBox.value && originalPipelineText) pipeBox.value = originalPipelineText;
     form.querySelector(".correction-note").focus();
+  });
+
+  form.querySelector(".btn-correction-reset").addEventListener("click", () => {
+    form.querySelector(".correction-pipeline").value = originalPipelineText;
   });
 
   form.querySelector(".btn-correction-cancel").addEventListener("click", () => {
@@ -2252,7 +2878,11 @@ function buildFeedbackSection(state, question, queryMeta, resultCount) {
     const note     = form.querySelector(".correction-note").value.trim();
     const pipeText = form.querySelector(".correction-pipeline").value.trim();
     let correctedPipeline = [];
-    if (pipeText) {
+    // Only treat the textarea as a real correction if the user actually edited
+    // it. An unchanged prefill means "the pipeline shown was wrong" — promoting
+    // it to weight 2.5 would teach the system the broken answer.
+    const userEdited = pipeText && pipeText !== originalPipelineText.trim();
+    if (userEdited) {
       try { correctedPipeline = JSON.parse(pipeText); }
       catch { alert("Invalid JSON in corrected pipeline — check brackets and quotes."); return; }
       if (!Array.isArray(correctedPipeline)) {
@@ -2283,7 +2913,7 @@ function buildFeedbackSection(state, question, queryMeta, resultCount) {
 }
 
 
-// ── Submit feedback to /api/feedback ─────────────────────────
+// Submit feedback to /api/feedback
 async function submitFeedback(question, queryMeta, resultCount, rating, correctionNote, correctedPipeline) {
   try {
     const res = await fetch("/api/feedback", {
@@ -2307,7 +2937,7 @@ async function submitFeedback(question, queryMeta, resultCount, rating, correcti
 }
 
 
-// ── Init ──────────────────────────────────────────────────────
+// Init
 renderSidebar();
 questionInput.focus();
 </script>

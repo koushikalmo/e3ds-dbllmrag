@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import json
 import time
@@ -13,8 +14,13 @@ from lib.query_examples    import (
     find_similar_examples_vector,
     format_examples_for_prompt,
 )
+from lib.relationships     import (
+    classify_with_relationships,
+    render_relationship_block,
+    ClassificationResult,
+)
 
-MAX_ATTEMPTS = int(os.getenv("LLM_MAX_RETRIES", "3"))
+MAX_ATTEMPTS = int(os.getenv("LLM_MAX_RETRIES", "10"))
 
 _known_fields_cache: set[str] = set()
 _known_fields_ts:    float    = 0.0
@@ -40,7 +46,7 @@ def _get_known_fields() -> set[str]:
     except Exception:
         pass
 
-    # Hardcoded fallback — used only before schema discovery has run
+    # fallback until schema discovery has run at least once
     return {
         "appInfo.owner", "appInfo.appName",
         "loggedInUserData.name",
@@ -65,6 +71,21 @@ def detect_relevant_databases(question: str) -> tuple[bool, bool]:
     if not needs_stream and not needs_appconfigs:
         needs_stream = True  # default to stream
     return needs_stream, needs_appconfigs
+
+
+def _render_classification_hints(c: ClassificationResult) -> str:
+    if not (c.owner_hint or c.merge_key or c.required_filters):
+        return ""
+    lines = ["CLASSIFICATION HINTS (from relationship graph — use these):"]
+    lines.append(f"  • Query type:  {c.query_type}  (db_hint={c.db_hint})")
+    if c.owner_hint:
+        lines.append(f"  • Owner in question: \"{c.owner_hint}\"  (use as appConfigs collection name or in $match)")
+    if c.merge_key:
+        lines.append(f"  • mergeKey:    \"{c.merge_key}\"  (MUST be set on the dual query)")
+    for f in c.required_filters:
+        lines.append(f"  • REQUIRED filter on {f['db']}: {f['field']} = \"{f['value']}\"  — {f['reason']}")
+    lines.append("")
+    return "\n".join(lines) + "\n"
 
 
 def _extract_json(raw: str) -> dict:
@@ -97,23 +118,9 @@ def _fix_pipeline_limits(pipeline: list) -> list:
         gi  = ops.index("$group")
         pre = [i for i, o in enumerate(ops) if o == "$limit" and i < gi]
         # Remove any $limit placed before $group (wrong — truncates input)
-        fixed = [s for i, s in enumerate(pipeline) if i not in pre]
-        for s in fixed:
-            if op(s) == "$limit" and isinstance(lim(s), int) and lim(s) > 200:
-                s["$limit"] = 200
-        fops = [op(s) for s in fixed]
-        if "$limit" not in fops[fops.index("$group"):]:
-            fixed.append({"$limit": 50})
-        return fixed
+        return [s for i, s in enumerate(pipeline) if i not in pre]
 
-    lims   = [i for i, o in enumerate(ops) if o == "$limit"]
-    if not lims:
-        return list(pipeline) + [{"$limit": 50}]
-    val    = lim(pipeline[lims[-1]])
-    capped = min(val, 200) if isinstance(val, int) and val > 0 else 50
-    fixed  = [s for s in pipeline if op(s) != "$limit"]
-    fixed.append({"$limit": capped})
-    return fixed
+    return list(pipeline)
 
 
 def _fix_query_obj(query_obj: dict) -> dict:
@@ -210,7 +217,7 @@ def _validate_field_names(query_obj: dict) -> list[str]:
     return suspicious
 
 
-# Common LLM field name mistakes → correct field
+# field names the model keeps getting wrong, mapped to the real ones
 _FIELD_ALIASES: dict[str, str] = {
     "clientinfo.country_code":          "clientInfo.country_name",
     "clientinfo.countrycode":           "clientInfo.country_name",
@@ -285,15 +292,25 @@ async def generate_query(
     collection:       str = "Apr_2025",
     conversation_ctx: str = "",
 ) -> dict:
-    needs_stream, needs_appconfigs = detect_relevant_databases(question)
-    db_hint = "both" if needs_stream and needs_appconfigs else "appconfigs" if needs_appconfigs else "stream"
+    classification = await classify_with_relationships(question)
+    needs_stream     = classification.db_hint in ("stream", "both")
+    needs_appconfigs = classification.db_hint in ("appconfigs", "both")
+    db_hint          = classification.db_hint
 
     schema_ctx    = await retrieve_schema_context(question, needs_stream, needs_appconfigs, top_k=20)
-    system_prompt = build_system_prompt(needs_stream, needs_appconfigs, schema_ctx)
+    system_prompt = build_system_prompt(
+        include_stream     = needs_stream,
+        include_appconfigs = needs_appconfigs,
+        schema_context     = schema_ctx,
+        relationship_block = render_relationship_block(),
+    )
 
     similar = await find_similar_examples_vector(question, db_hint, top_n=2)
     if similar is None:
         similar = find_similar_examples(question, db_hint, top_n=2)
+    # remember which examples we showed the model — main.py bumps their
+    # success/failure counters once we know how the query went
+    retrieved_ids = [s.get("id") for s in (similar or []) if s.get("id")]
     examples_text = format_examples_for_prompt(similar)
 
     live_ctx = await get_live_context(collection, question)
@@ -301,6 +318,8 @@ async def generate_query(
 
     digest_text = get_digest_text()
     digest_block = f"{digest_text}\n\n" if digest_text else ""
+
+    classification_block = _render_classification_hints(classification)
 
     now_unix = int(time.time())
     now_iso  = datetime.now(timezone.utc).isoformat()
@@ -313,12 +332,15 @@ async def generate_query(
         f"Current Unix timestamp: {now_unix}\n\n"
         f"{digest_block}"
         f"{live_ctx_block}"
+        f"{classification_block}"
         f"Question: {question}"
     )
 
     print(
         f"[generator] '{question[:60]}' | "
-        f"stream={needs_stream} appconfigs={needs_appconfigs} | "
+        f"type={classification.query_type} db_hint={db_hint} "
+        f"owner={classification.owner_hint or '—'} "
+        f"merge_key={classification.merge_key or '—'} | "
         f"examples={len(similar)} live_ctx={'yes' if live_ctx else 'no'} digest={'yes' if digest_text else 'no'}"
     )
 
@@ -373,6 +395,8 @@ async def generate_query(
         else:
             print(f"[generator] Validated on attempt {attempt}")
 
+        # main.py pops this off before the response goes out
+        query_obj["_retrieved_example_ids"] = retrieved_ids
         return query_obj
 
     raise ValueError(
@@ -382,11 +406,16 @@ async def generate_query(
     )
 
 
-def save_successful_query(question: str, query_obj: dict, result_count: int) -> None:
+def save_successful_query(
+    question:       str,
+    query_obj:      dict,
+    result_count:   int,
+    accuracy_score: int | None = None,
+) -> None:
     from lib.query_examples import add_example
     needs_stream, needs_appconfigs = detect_relevant_databases(question)
     db_hint = "both" if needs_stream and needs_appconfigs else "appconfigs" if needs_appconfigs else "stream"
     try:
-        add_example(question, query_obj, result_count, db_hint)
+        add_example(question, query_obj, result_count, db_hint, accuracy_score=accuracy_score)
     except Exception as e:
         print(f"[generator] Failed to save example (non-fatal): {e}")

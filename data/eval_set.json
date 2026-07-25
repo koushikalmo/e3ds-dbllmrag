@@ -1,0 +1,1973 @@
+[
+  {
+    "id": "eval-auto-001",
+    "question": "Show VPN users from October 2025",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Oct_2025",
+      "operation": "find",
+      "query": {
+        "clientInfo.fullInfo.security.is_vpn": true,
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "projection": {
+        "appInfo.owner": 1,
+        "clientInfo.country_name": 1,
+        "clientInfo.city": 1
+      },
+      "sort": {
+        "startTimeStamp": -1
+      },
+      "limit": 50,
+      "explanation": "Lists recent VPN users in October 2025",
+      "resultLabel": "VPN Users",
+      "assumptions": [
+        "Used Oct_2025 as the default collection because no month was specified"
+      ],
+      "confidence": "high"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": []
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 50,
+      "timestamp": "2026-04-17T11:41:36.451976+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-002",
+    "question": "Show VPN users of 2024",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "find",
+      "query": {
+        "clientInfo.fullInfo.security.is_vpn": true,
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "projection": {
+        "appInfo.owner": 1,
+        "clientInfo.country_name": 1,
+        "clientInfo.city": 1
+      },
+      "sort": {
+        "startTimeStamp": -1
+      },
+      "limit": 50,
+      "explanation": "Lists recent VPN users in April 2026",
+      "resultLabel": "VPN Users",
+      "assumptions": [
+        "Used Apr_2026 as the default collection because no month was specified"
+      ],
+      "confidence": "high"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": []
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 50,
+      "timestamp": "2026-04-17T02:24:21.700189+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-003",
+    "question": "What is the average load time of each month of 2025",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Jan_2025",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$appInfo.owner",
+            "avgLoadTime": {
+              "$avg": "$loadTime"
+            },
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "avgLoadTime": -1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Calculates average load time in seconds per owner, sorted by slowest first.",
+      "resultLabel": "Average Load Time by Owner"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "avgLoadTime",
+        "sessions"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 50,
+      "timestamp": "2026-04-15T19:15:20.042084+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-004",
+    "question": "Top 5 countries by session count in Sep 2025.",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Sep_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$clientInfo.country_name",
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Groups real user sessions by country and counts them descending.",
+      "resultLabel": "Top Countries by Sessions"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "sessions"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 50,
+      "timestamp": "2026-04-12T12:43:58.309201+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-005",
+    "question": "What is the average session duration per city?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            },
+            "DisconnectTime_Timestamp": {
+              "$exists": true
+            },
+            "startTimeStamp": {
+              "$exists": true
+            }
+          }
+        },
+        {
+          "$addFields": {
+            "durationSeconds": {
+              "$subtract": [
+                "$DisconnectTime_Timestamp",
+                "$startTimeStamp"
+              ]
+            }
+          }
+        },
+        {
+          "$match": {
+            "durationSeconds": {
+              "$gt": 0
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$clientInfo.city",
+            "avgDuration": {
+              "$avg": "$durationSeconds"
+            },
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Calculates average session duration in seconds per city, filtering out zero-duration sessions.",
+      "resultLabel": "Session Duration by City"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "avgDuration",
+        "sessions"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 80,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-006",
+    "question": "mong all streaming in January 2025 how many diffrent unreal version",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Jan_2025",
+      "operation": "distinct",
+      "field": "appInfo.appVersion",
+      "query": {
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "explanation": "Lists all distinct Unreal Engine versions used in January 2025",
+      "resultLabel": "Distinct Unreal Versions"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "value"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 48,
+      "timestamp": "2026-04-15T18:06:42.638520+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-007",
+    "question": "From how many different browsers streamed in January 2025. Give browser name also",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Jan_2025",
+      "operation": "distinct",
+      "field": "userDeviceInfo.client.name",
+      "query": {
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "explanation": "Lists all distinct browsers used in January 2025",
+      "resultLabel": "Distinct Browsers"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "value"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 27,
+      "timestamp": "2026-04-15T16:31:51.608817+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-008",
+    "question": "Give all version string name",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "distinct",
+      "field": "ue4ExeInfo.versionString",
+      "query": {
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "explanation": "Lists all distinct version strings used in April 2026",
+      "resultLabel": "Distinct Version Strings"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "value"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 19,
+      "timestamp": "2026-04-15T19:04:09.208579+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-009",
+    "question": "How many sessions per country this month?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$clientInfo.country_name",
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Groups real user sessions by country and counts them descending.",
+      "resultLabel": "Sessions by Country"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "sessions"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 45,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-010",
+    "question": "Give all users name and streaming time of april 16 2026.",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "VideoStreamStartedAt_Timestamp": {
+              "$gte": 1776384000000,
+              "$lt": 1776470400000
+            },
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$loggedInUserData.name",
+            "userName": {
+              "$first": "$loggedInUserData.name"
+            },
+            "sessionCount": {
+              "$sum": 1
+            },
+            "totalMinutesStreamed": {
+              "$sum": {
+                "$divide": [
+                  {
+                    "$max": [
+                      "$VideoStreamContinuedAt_Timestamp",
+                      "$DataChannelHeartBeatReceivedAt_Timestamp"
+                    ]
+                  },
+                  "$VideoStreamStartedAt_Timestamp"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Lists users and their streaming time on April 16, 2026",
+      "resultLabel": "Users Streaming Time",
+      "assumptions": [
+        "Used Apr_2026 as the default collection because no month was specified"
+      ],
+      "confidence": "high"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "userName",
+        "sessionCount",
+        "totalMinutesStreamed"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 7,
+      "timestamp": "2026-04-17T17:06:47.827524+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-011",
+    "question": "From how many different OS streamed in January 2025. Give OS name also",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Jan_2025",
+      "operation": "distinct",
+      "field": "userDeviceInfo.os.name",
+      "query": {
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "explanation": "Lists all distinct operating systems used in January 2025",
+      "resultLabel": "Distinct OSes"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "value"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 7,
+      "timestamp": "2026-04-15T16:23:20.269585+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-012",
+    "question": "Top 5 countries by session in April 2026",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$clientInfo.country_name",
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 5
+        }
+      ],
+      "explanation": "Groups real user sessions by country and counts them descending.",
+      "resultLabel": "Top Countries by Sessions"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "sessions"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 5,
+      "timestamp": "2026-04-15T14:12:50.548859+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-013",
+    "question": "Total streaming minutes of april 16th 2025",
+    "db_hint": "both",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$addFields": {
+            "streamEndTs": {
+              "$ifNull": [
+                "$VideoStreamContinuedAt_Timestamp",
+                "$DataChannelHeartBeatReceivedAt_Timestamp"
+              ]
+            }
+          }
+        },
+        {
+          "$addFields": {
+            "durationMs": {
+              "$subtract": [
+                "$streamEndTs",
+                "$VideoStreamStartedAt_Timestamp"
+              ]
+            }
+          }
+        },
+        {
+          "$match": {
+            "durationMs": {
+              "$gt": 0
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": null,
+            "totalMinutesStreamed": {
+              "$sum": {
+                "$divide": [
+                  "$durationMs",
+                  60000
+                ]
+              }
+            }
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Calculates total streaming minutes for April 16th, 2025",
+      "resultLabel": "Total Streaming Minutes on April 16th",
+      "assumptions": [
+        "Assumed the question refers to viewer location (clientInfo), not server location (elInfo)",
+        "Excluded internal e3ds_employee traffic as per standard filtering"
+      ],
+      "confidence": "high"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "totalMinutesStreamed"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "both",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "2026-04-17T23:11:42.504758+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-014",
+    "question": "Total streaming minutes of april 17 Apr 2026",
+    "db_hint": "both",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "VideoStreamStartedAt_Timestamp": {
+              "$gte": 1776458400000,
+              "$lt": 1776544800000
+            },
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$addFields": {
+            "streamEndTs": {
+              "$ifNull": [
+                "$VideoStreamContinuedAt_Timestamp",
+                "$DataChannelHeartBeatReceivedAt_Timestamp"
+              ]
+            }
+          }
+        },
+        {
+          "$addFields": {
+            "durationMs": {
+              "$subtract": [
+                "$streamEndTs",
+                "$VideoStreamStartedAt_Timestamp"
+              ]
+            }
+          }
+        },
+        {
+          "$match": {
+            "durationMs": {
+              "$gt": 0
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": null,
+            "totalMinutesStreamed": {
+              "$sum": {
+                "$divide": [
+                  "$durationMs",
+                  60000
+                ]
+              }
+            }
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Calculates total streaming minutes on April 17, 2026",
+      "resultLabel": "Total Streaming Minutes",
+      "assumptions": [
+        "Used Apr_2026 as the default collection because no month was specified"
+      ],
+      "confidence": "high"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "totalMinutesStreamed"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "both",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "2026-04-17T22:17:23.602100+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-015",
+    "question": "How many sessions did owner 'eduardo' have in April 2026?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "countDocuments",
+      "query": {
+        "appInfo.owner": "eduardo",
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "explanation": "Counts sessions for owner 'eduardo' in April 2026",
+      "resultLabel": "Sessions for Eduardo"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "count"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "2026-04-17T11:47:22.694871+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-016",
+    "question": "how many session from bangladesh on oct 2025",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Oct_2025",
+      "operation": "countDocuments",
+      "query": {
+        "clientInfo.country_name": "Bangladesh",
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "explanation": "Counts sessions from Bangladesh in October 2025",
+      "resultLabel": "Sessions from Bangladesh"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "count"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "2026-04-15T19:38:35.846561+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-017",
+    "question": "average load time on september 2025",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Sep_2025",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": null,
+            "totalLoadTime": {
+              "$sum": "$loadTime"
+            },
+            "sessionCount": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$project": {
+            "averageLoadTime": {
+              "$divide": [
+                "$totalLoadTime",
+                "$sessionCount"
+              ]
+            }
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Calculates the average load time in seconds for all sessions in September 2025.",
+      "resultLabel": "Average Load Time"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "averageLoadTime"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "2026-04-15T19:34:10.618779+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-018",
+    "question": "How many sessions from India in Oct 2025?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Oct_2025",
+      "operation": "countDocuments",
+      "query": {
+        "clientInfo.country_name": "India",
+        "e3ds_employee": {
+          "$ne": true
+        }
+      },
+      "explanation": "Counts sessions from India in October 2025",
+      "resultLabel": "Sessions from India"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "count"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "2026-04-15T19:08:49.486886+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-019",
+    "question": "Which apps had the most sessions last month?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Feb_2026",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": {
+              "$or": [
+                "$appInfo.owner",
+                "$appInfo.appName"
+              ]
+            },
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 20
+        }
+      ],
+      "explanation": "Groups sessions by app owner and name, counts them, and shows the top 20 apps.",
+      "resultLabel": "Top Apps"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "sessions"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "2026-04-15T13:13:21.128488+00:00",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-020",
+    "question": "What is the average load time per owner?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            },
+            "loadTime": {
+              "$gt": 0
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$appInfo.owner",
+            "avgLoadTime": {
+              "$avg": "$loadTime"
+            },
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "avgLoadTime": -1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Calculates average load time in seconds per owner, sorted by slowest first.",
+      "resultLabel": "Average Load Time by Owner"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "avgLoadTime",
+        "sessions"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 30,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-021",
+    "question": "Show sessions with average round trip time over 200ms",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            },
+            "webRtcStatsData.avgRoundTripTime": {
+              "$exists": true
+            }
+          }
+        },
+        {
+          "$addFields": {
+            "rttFloat": {
+              "$toDouble": "$webRtcStatsData.avgRoundTripTime"
+            }
+          }
+        },
+        {
+          "$match": {
+            "rttFloat": {
+              "$gt": 0.2
+            }
+          }
+        },
+        {
+          "$project": {
+            "appInfo.owner": 1,
+            "clientInfo.city": 1,
+            "clientInfo.country_name": 1,
+            "rttFloat": 1,
+            "loadTime": 1
+          }
+        },
+        {
+          "$sort": {
+            "rttFloat": -1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Finds sessions with high round-trip time (>200ms), converting the string RTT field to a number first.",
+      "resultLabel": "High Latency Sessions"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "appInfo.owner",
+        "clientInfo.city",
+        "clientInfo.country_name",
+        "rttFloat",
+        "loadTime"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 22,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-022",
+    "question": "Which sessions had packet loss above 500?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            },
+            "webRtcStatsData.packetsLost": {
+              "$gt": 500
+            }
+          }
+        },
+        {
+          "$project": {
+            "appInfo.owner": 1,
+            "clientInfo.city": 1,
+            "clientInfo.country_name": 1,
+            "webRtcStatsData.packetsLost": 1,
+            "webRtcStatsData.avgBitrate": 1,
+            "loadTime": 1
+          }
+        },
+        {
+          "$sort": {
+            "webRtcStatsData.packetsLost": -1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ],
+      "explanation": "Finds sessions with high packet loss (>500 packets), sorted worst-first.",
+      "resultLabel": "High Packet Loss Sessions"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "appInfo.owner",
+        "clientInfo.city",
+        "clientInfo.country_name",
+        "webRtcStatsData.packetsLost",
+        "webRtcStatsData.avgBitrate",
+        "loadTime"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 18,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-023",
+    "question": "Which servers (computers) are handling the most sessions?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$elInfo.computerName",
+            "sessions": {
+              "$sum": 1
+            },
+            "avgBitrate": {
+              "$avg": "$webRtcStatsData.avgBitrate"
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 20
+        }
+      ],
+      "explanation": "Groups sessions by server hostname and counts them, showing most-used servers.",
+      "resultLabel": "Sessions by Server"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "sessions",
+        "avgBitrate"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 15,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-024",
+    "question": "Which browsers are most commonly used by viewers?",
+    "db_hint": "stream",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2025",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$userDeviceInfo.client.name",
+            "count": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "count": -1
+          }
+        },
+        {
+          "$limit": 20
+        }
+      ],
+      "explanation": "Groups sessions by browser name and counts each, sorted by most popular.",
+      "resultLabel": "Sessions by Browser"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "_id",
+        "count"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "stream",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 8,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-auto-025",
+    "question": "Show me the subscription status for owner eduardo",
+    "db_hint": "appconfigs",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "appConfigs",
+      "collection": "eduardo",
+      "pipeline": [
+        {
+          "$match": {
+            "_id": "usersinfo"
+          }
+        },
+        {
+          "$project": {
+            "maxUserLimit": 1,
+            "shouldAutoRenew": 1,
+            "paidMinutes": 1,
+            "paidSecondsUsage": 1,
+            "products": 1,
+            "SubscriptionEndDate._seconds": 1,
+            "SubscriptionStartDate._seconds": 1,
+            "apiKeys.apiKey": 0,
+            "streamingApiKeys.apiKey": 0
+          }
+        }
+      ],
+      "explanation": "Fetches subscription and billing data for the owner 'eduardo' from appConfigs.",
+      "resultLabel": "Subscription Status: eduardo"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "maxUserLimit",
+        "shouldAutoRenew",
+        "paidMinutes",
+        "paidSecondsUsage",
+        "products",
+        "SubscriptionEndDate._seconds"
+      ]
+    },
+    "locked": false,
+    "tags": [
+      "auto-proposed",
+      "appconfigs",
+      "auto"
+    ],
+    "source_example": {
+      "weight": 1.0,
+      "source": "auto",
+      "result_count": 1,
+      "timestamp": "",
+      "accuracy_score": null
+    }
+  },
+  {
+    "id": "eval-gold-001",
+    "question": "sys-e2e-whole: count sessions in Apr_2026",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "pipeline": [
+        {
+          "$match": {
+            "e3ds_employee": {
+              "$ne": true
+            }
+          }
+        },
+        {
+          "$count": "count"
+        }
+      ],
+      "operation": "aggregate"
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": []
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "smoke",
+      "count"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-24T17:16:59.843430+00:00",
+      "result_count": 1
+    }
+  },
+  {
+    "id": "eval-gold-002",
+    "question": "How many sessions used a VPN in April 2026?",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$match": {
+            "clientInfo.fullInfo.security.is_vpn": true
+          }
+        },
+        {
+          "$group": {
+            "_id": null,
+            "vpn_sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$project": {
+            "_id": 0,
+            "vpn_sessions": 1
+          }
+        }
+      ]
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "vpn_sessions"
+      ]
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "vpn",
+      "monthly-count"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-25T17:23:17.739731+00:00",
+      "result_count": 1
+    }
+  },
+  {
+    "id": "eval-gold-003",
+    "question": "Top 3 owners by session count in April 2026",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "operation": "aggregate",
+      "pipeline": [
+        {
+          "$group": {
+            "_id": "$appInfo.owner",
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 3
+        },
+        {
+          "$project": {
+            "_id": 0,
+            "owner": "$_id",
+            "sessions": 1
+          }
+        }
+      ]
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "owner",
+        "sessions"
+      ]
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "owner-ranking"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-25T17:27:28.335947+00:00",
+      "result_count": 3
+    }
+  },
+  {
+    "id": "eval-gold-004",
+    "question": "What is the average round trip time (RTT) per browser this month?",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "operation": "aggregate",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "pipeline": [
+        {
+          "$match": {
+            "webRtcStatsData.avgRoundTripTime": {
+              "$ne": null,
+              "$gt": 0
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$userDeviceInfo.client.name",
+            "avgRTT": {
+              "$avg": {
+                "$multiply": [
+                  "$webRtcStatsData.avgRoundTripTime",
+                  1000
+                ]
+              }
+            },
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$match": {
+            "_id": {
+              "$ne": null
+            }
+          }
+        },
+        {
+          "$sort": {
+            "avgRTT": 1
+          }
+        },
+        {
+          "$project": {
+            "_id": 0,
+            "browser": "$_id",
+            "avgRTT": 1,
+            "sessions": 1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ]
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "browser",
+        "avgRTT",
+        "sessions"
+      ]
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "webrtc",
+      "rtt",
+      "browser",
+      "monthly"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-25T22:52:41.020483+00:00",
+      "result_count": 23
+    }
+  },
+  {
+    "id": "eval-gold-005",
+    "question": "What is the average load time per owner?",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "operation": "aggregate",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "pipeline": [
+        {
+          "$match": {
+            "loadTime": {
+              "$ne": null,
+              "$gt": 0
+            },
+            "appInfo.owner": {
+              "$ne": null
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$appInfo.owner",
+            "avgLoadTime": {
+              "$avg": "$loadTime"
+            },
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "avgLoadTime": -1
+          }
+        },
+        {
+          "$project": {
+            "_id": 0,
+            "owner": "$_id",
+            "avgLoadTime": 1,
+            "sessions": 1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ]
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "owner",
+        "avgLoadTime",
+        "sessions"
+      ]
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "loadtime",
+      "owner",
+      "performance"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-25T22:52:41.400170+00:00",
+      "result_count": 50
+    }
+  },
+  {
+    "id": "eval-gold-006",
+    "question": "Which apps had the most sessions last month?",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "operation": "aggregate",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "pipeline": [
+        {
+          "$match": {
+            "appInfo.appName": {
+              "$ne": null
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$appInfo.appName",
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 10
+        },
+        {
+          "$project": {
+            "_id": 0,
+            "appName": "$_id",
+            "sessions": 1
+          }
+        }
+      ]
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "appName",
+        "sessions"
+      ]
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "apps",
+      "top-n",
+      "sessions"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-25T22:52:41.763152+00:00",
+      "result_count": 10
+    }
+  },
+  {
+    "id": "eval-gold-007",
+    "question": "Which sessions had packet loss above 500?",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "operation": "aggregate",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "pipeline": [
+        {
+          "$match": {
+            "webRtcStatsData.packetsLost": {
+              "$gt": 500
+            }
+          }
+        },
+        {
+          "$sort": {
+            "webRtcStatsData.packetsLost": -1
+          }
+        },
+        {
+          "$project": {
+            "_id": 0,
+            "owner": "$appInfo.owner",
+            "appName": "$appInfo.appName",
+            "country": "$clientInfo.country_name",
+            "packetsLost": "$webRtcStatsData.packetsLost",
+            "startTimeStamp": 1
+          }
+        },
+        {
+          "$limit": 50
+        }
+      ]
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "owner",
+        "appName",
+        "country",
+        "packetsLost",
+        "startTimeStamp"
+      ]
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "webrtc",
+      "packet-loss",
+      "quality"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-25T22:52:42.145100+00:00",
+      "result_count": 50
+    }
+  },
+  {
+    "id": "eval-gold-008",
+    "question": "Which browsers are most commonly used by viewers?",
+    "db_hint": "stream",
+    "collection": "Apr_2026",
+    "gold_pipeline": {
+      "queryType": "single",
+      "operation": "aggregate",
+      "database": "stream-datastore",
+      "collection": "Apr_2026",
+      "pipeline": [
+        {
+          "$match": {
+            "userDeviceInfo.client.name": {
+              "$ne": null
+            }
+          }
+        },
+        {
+          "$group": {
+            "_id": "$userDeviceInfo.client.name",
+            "sessions": {
+              "$sum": 1
+            }
+          }
+        },
+        {
+          "$sort": {
+            "sessions": -1
+          }
+        },
+        {
+          "$limit": 10
+        },
+        {
+          "$project": {
+            "_id": 0,
+            "browser": "$_id",
+            "sessions": 1
+          }
+        }
+      ]
+    },
+    "gold_result_shape": {
+      "min_rows": 1,
+      "max_rows": 200,
+      "required_columns": [
+        "browser",
+        "sessions"
+      ]
+    },
+    "locked": true,
+    "tags": [
+      "trainer-gold",
+      "stream",
+      "browser",
+      "top-n",
+      "demographics"
+    ],
+    "trainer_meta": {
+      "saved_at": "2026-04-25T22:52:42.508955+00:00",
+      "result_count": 10
+    }
+  }
+]

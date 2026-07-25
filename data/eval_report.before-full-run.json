@@ -1,0 +1,32 @@
+{
+  "ran_at": "2026-04-25T17:31:01.895770+00:00",
+  "target": "http://127.0.0.1:4500",
+  "total": 1,
+  "cases": [
+    {
+      "id": "eval-gold-002",
+      "question": "How many sessions used a VPN in April 2026?",
+      "locked": true,
+      "passed": false,
+      "score": 93,
+      "tier": "high",
+      "elapsed": 65.84,
+      "rows": 1,
+      "diffs": [
+        "pipeline: operation: gold=aggregate got=countDocuments",
+        "pipeline: pipeline stages differ (gold=3 got=0)",
+        "shape: missing required columns: ['vpn_sessions']"
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "avg_score": 93.0
+  },
+  "delta": {
+    "passed_delta": 0,
+    "avg_score_delta": 93.0
+  }
+}

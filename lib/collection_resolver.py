@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 from datetime import datetime, timezone, timedelta
 
@@ -31,7 +32,7 @@ _MONTH_ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 # longer names first so "september" is tried before "sep"
 _MONTH_ALT = "|".join(sorted(_MONTH_MAP.keys(), key=len, reverse=True))
 
-# ── compiled patterns (ordered from most-specific to least) ──────────────────
+# compiled patterns (ordered from most-specific to least)
 
 # "16th April 2026", "16 April 2026", "16th of April 2026"
 _PAT_ORDINAL_DMY = re.compile(
@@ -89,7 +90,7 @@ def resolve_collection(question: str, default_collection: str) -> str:
     now   = datetime.now(timezone.utc)
     lower = q.lower()
 
-    # ── relative day references ───────────────────────────────────────────────
+    # relative day references
     if "yesterday" in lower:
         d = now - timedelta(days=1)
         return _col(d.strftime("%b"), d.year)
@@ -122,7 +123,7 @@ def resolve_collection(question: str, default_collection: str) -> str:
     if "this year" in lower or "current year" in lower:
         return _col("Jan", now.year)
 
-    # ── specific date formats ─────────────────────────────────────────────────
+    # specific date formats
 
     # ordinal DMY: "16th April 2026"
     m = _PAT_ORDINAL_DMY.search(q)
@@ -159,7 +160,7 @@ def resolve_collection(question: str, default_collection: str) -> str:
     if m:
         return _col(_QUARTER_START[int(m.group(1))], m.group(2))
 
-    # ── month + year ──────────────────────────────────────────────────────────
+    # month + year
     m = _PAT_MONTH_YEAR.search(q)
     if m:
         return _col(_MONTH_MAP[m.group(1).lower()], m.group(2))
@@ -172,7 +173,7 @@ def resolve_collection(question: str, default_collection: str) -> str:
     if m:
         return _col(_MONTH_MAP[m.group(1).lower()], _expand_year(m.group(2)))
 
-    # ── month only — assume year from default collection ──────────────────────
+    # month only — assume year from default collection
     m = _PAT_MONTH_ONLY.search(q)
     if m:
         abbr      = _MONTH_MAP[m.group(1).lower()]

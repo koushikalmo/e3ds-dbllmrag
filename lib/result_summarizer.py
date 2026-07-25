@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import asyncio
 from typing import Any
@@ -5,7 +6,7 @@ from typing import Any
 from lib.llm_provider import generate_text
 
 CHUNK_SIZE           = 25
-MAX_DOCS_TO_SUMMARIZE = 200
+MAX_DOCS_TO_SUMMARIZE = None  # no cap — analyse the full result set
 
 # Strip these fields before sending to LLM — sensitive or too bulky
 _STRIP_FIELDS = {
@@ -76,7 +77,7 @@ async def _synthesize_summaries(chunk_summaries: list[str], question: str, total
 
 
 async def summarize_results(results: list[dict], question: str) -> dict:
-    docs_to_analyze = results[:MAX_DOCS_TO_SUMMARIZE]
+    docs_to_analyze = results
     total = len(docs_to_analyze)
 
     if total == 0:

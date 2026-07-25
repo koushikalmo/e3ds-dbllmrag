@@ -170,8 +170,38 @@ DATE FILTERING — CRITICAL:
   To filter a specific day:
     { "VideoStreamStartedAt_Timestamp": { "$gte": <day_start_ms>, "$lt": <day_end_ms> } }
 
-- webRtcStatsData.avgRoundTripTime is stored as a STRING.
-  Always convert before sorting/comparing: { "$toDouble": "$webRtcStatsData.avgRoundTripTime" }
+WEBRTC METRICS (webRtcStatsData) — ALL ALREADY NUMBERS, NEVER USE $convert / $toDouble:
+  These fields are stored as native double/int. Reference them directly with "$webRtcStatsData.<field>".
+  DO NOT wrap them in $convert, $toDouble, $toInt, or $toDecimal — the conversion will fail because
+  numeric BSON values cannot be re-parsed as if they were string labels.
+  DO NOT invent field names like "Net RTT (ms)", "Bitrate (kbps)" — those are human labels, not paths.
+
+  Round-trip time (units = SECONDS, multiply by 1000 for ms):
+    webRtcStatsData.avgRoundTripTime         ← float, primary "RTT" answer
+    webRtcStatsData.minRoundTripTime         ← float
+    webRtcStatsData.maxRoundTripTime         ← float
+    webRtcStatsData.currentRoundTripTime     ← float, last sample
+  Bitrate (units = kbps):
+    webRtcStatsData.avgBitrate · bitrate · highBitrate · lowBitrate     ← all float/int
+  Frame rate:
+    webRtcStatsData.avgFramerate · framerate · highFramerate · lowFramerate    ← all int/float
+  Loss / volume:
+    webRtcStatsData.packetsLost                ← int, count over the session
+    webRtcStatsData.bytesReceived              ← int
+    webRtcStatsData.framesDecoded              ← int
+
+  Examples (correct):
+    avg RTT in ms by browser:
+      { "$group": { "_id": "$userDeviceInfo.client.name",
+                    "avgRTTms": { "$avg": { "$multiply": ["$webRtcStatsData.avgRoundTripTime", 1000] } } } }
+    sessions with packetsLost > 500:
+      { "$match": { "webRtcStatsData.packetsLost": { "$gt": 500 } } }
+    top 10 noisiest sessions:
+      { "$sort": { "webRtcStatsData.packetsLost": -1 } }, { "$limit": 10 }
+
+LOAD TIME (loadTime) — also a native float (seconds):
+  Reference directly as "$loadTime". No conversion. Average per owner:
+    { "$group": { "_id": "$appInfo.owner", "avgLoadTime": { "$avg": "$loadTime" }, "sessions": { "$sum": 1 } } }
 
 CRITICAL FIELD NAMES (exact case — wrong names return 0 results):
 - Session start:    "VideoStreamStartedAt_Timestamp"              ← ms. NOT startTimeStamp (seconds)
@@ -238,16 +268,11 @@ To query an owner's config:   "collection": "<owner>", pipeline: [{ "$match": { 
 - NEVER project apiKeys.apiKey or streamingApiKeys.apiKey.
 
 ═══════════════════════════════════════════════
-CROSS-DATABASE JOIN
+CROSS-DATABASE JOIN — SEE RELATIONSHIP GRAPH SECTION ABOVE
 ═══════════════════════════════════════════════
-MongoDB cannot $lookup across two connection strings. Use queryType="dual".
-
-Join key:
-  stream-datastore.appInfo.owner  ←→  appConfigs collection name
-  e.g. appInfo.owner = "eduardo"  →   collection "eduardo" in appConfigs
-
-For dual queries: always use "pipeline" (aggregate). The backend runs both concurrently
-and merges in Python. Stream query should group by appInfo.owner.
+Join rules, discriminators and merge keys are declared in the RELATIONSHIP GRAPH block.
+MongoDB cannot $lookup across two connection strings — always use queryType="dual".
+The backend runs both queries concurrently and merges in Python.
 
 DUAL QUERY REQUIRED FIELDS — every sub-query MUST have all three:
   "database":   "stream-datastore" or "appConfigs"   ← REQUIRED
@@ -273,18 +298,17 @@ Example dual query structure:
 """
 
 # Short DB structure summaries — field details come from vector RAG
+# Join keys and discriminators are declared in lib/relationships.py, injected separately.
 _STREAM_STRUCTURE = """
 DATABASE: stream-datastore
 One document = one user streaming session.
 Collections by month: Apr_2026, Mar_2026, Feb_2026, Jan_2026, Dec_2025, ...back to Dec_2023.
-Key join field: appInfo.owner links to the appConfigs collection name.
 """
 
 _APPCONFIGS_STRUCTURE = """
 DATABASE: appConfigs
 ~5,500+ collections, one per customer account.
 Collection name = owner username (e.g. "eduardo", "imerza").
-Each collection has up to 4 documents (usersinfo, InfoToConstructUrls, default, <appName>).
 """
 
 
@@ -292,8 +316,11 @@ def build_system_prompt(
     include_stream:     bool = True,
     include_appconfigs: bool = False,
     schema_context:     str  = "",
+    relationship_block: str  = "",
 ) -> str:
     parts = [_CORE_RULES]
+    if relationship_block:
+        parts.append(relationship_block)
     if include_stream:
         parts.append(_STREAM_STRUCTURE)
     if include_appconfigs:
